@@ -1,0 +1,11 @@
+{
+	"city": "Braunschweig",
+	"city_aviny": 2130,
+	"source": "aviny:izhamburg",
+	"title": "Braunschweig TV ({DATE})",
+	"description": "Pre and post prayer time Videos for Braunschweig on date {DATE}",
+	"thumbnails": "https://upload.wikimedia.org/wikipedia/de/thumb/5/53/Eidenbenzl%C3%B6we.svg/800px-Eidenbenzl%C3%B6we.svg.png",
+	"privacy": "unlisted",
+	"ffplayout_template": "ffplayout-template.yml",
+	"program_template": "network-program-hard.json"
+}

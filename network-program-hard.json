@@ -1,0 +1,26 @@
+{
+
+    "program": [
+        {
+            "name": "imsak",
+            "pre": ["media/dua-abuzar-thomali.mp4", "media/dua-sahar.m4v"],
+            "post": ["media/azan-moazzenzadeh.mkv", "media/azoma-albala.mkv"]
+        },
+        {
+            "name": "fajr",
+            "pre": [],
+            "post": ["media/azan-moazzenzadeh.mkv", "media/azoma-albala.mkv"]
+        },
+        {
+            "name": "dhuhr",
+            "pre": ["media/maryam-.mp4", "media/ya-zaljalal.mp4"],
+            "post": ["media/azan-moazzenzadeh.mkv", "media/azoma-albala.mkv", "media/doa-noor.mkv"]
+        },
+        {
+            "name": "maghrib",
+            "pre": ["media/quran-j18.mkv", "media/taha-abkar.mkv", "media/asma-alhosna.mp4"],
+            "post": ["media/azan-moazzenzadeh.mkv", "media/bird1.mp4", "media/bird2.mkv", "media/ya-ali-ya-azim.mkv", "media/allahomma-laka-somna.mkv", "media/dua-faraj.mkv", "media/doa-iftitah.mkv"]
+        }
+    ],
+    "timer": "media/timer.mp4"
+}
