@@ -1,0 +1,13 @@
+__pycache__/
+*.log
+azan-times.json
+client_secret.json
+ffplayout2.yml
+media/**
+playlist4.json
+time-info.txt
+user-oauth2.json
+devel
+**/*.swp
+*-debug/*.swp
+*-debug/
