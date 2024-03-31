@@ -21,7 +21,7 @@ Then, you need to install the python packages
 pip install tzfpy geopy requests pandas numpy ffmpeg_python google_auth_oauthlib google-api-python-client google-api-python-client oauth2client
 ```
 
-To run the program you need to fill the (media/)[media/] folder with appropriate videos you want to be played as specified in file (network-program-hard.json)[network-program-hard.json]. If you do thatn, then you can run the code to display the output on your local computer.
+To run the program you need to fill the [media/](media/) folder with appropriate videos you want to be played as specified in file [network-program-hard.json](network-program-hard.json). If you do thatn, then you can run the code to display the output on your local computer.
 ```
 python live-stream.py --out desktop
 ```
