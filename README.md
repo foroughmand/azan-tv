@@ -27,3 +27,13 @@ python live-stream.py --out desktop
 ```
 
 Without the `--out` option, the program creates a new live stream on Youtube and its url with be displayed at the end.
+
+# Configuration (setting the location)
+Configurations are located at file [config.json](config.json). 
+* `city`: Name of the city. After searching it in map services, lat and long of the city is retrieved and prayer times are retrieved from izhamburg website.
+* `city_aviny`: Id of the city in prayer.aviny.com website for retrieving prayer times from this website.
+* `source`: Colon separated list of services from which the prayer times are fetched. The options are "prayertimes", "avini", "izhamburg".
+* `title`, `description`, `thumbnails`, `privacy`: Settings for the Youtube broadcast.
+* `ffplayout_template`: The template file for the ffplayout application. The ffplayout config file will be generated from this template file after injecting the Youtube stream link into it.
+* `program_template`: Template file for the program before and after prayer times.
+
