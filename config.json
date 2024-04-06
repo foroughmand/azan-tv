@@ -7,5 +7,10 @@
 	"thumbnails": "https://upload.wikimedia.org/wikipedia/de/thumb/5/53/Eidenbenzl%C3%B6we.svg/800px-Eidenbenzl%C3%B6we.svg.png",
 	"privacy": "unlisted",
 	"ffplayout_template": "ffplayout-template.yml",
-	"program_template": "network-program-hard.json"
+	"program_template": "network-program-hard.json",
+	"translation": {
+		"imsak": "سحر", "fajr": "صبح", "sunrise": "طلوع", 
+                "dhuhr": "ظهر", "asr": "عصر", "sunset": "غروب", 
+                "maghrib": "مغرب", "isha": "عشا", "midnight": "نیمه‌شب"
+	}
 }

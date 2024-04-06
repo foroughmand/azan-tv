@@ -11,6 +11,14 @@ import httplib2
 from oauth2client.tools import argparser, run_flow
 import argparse
 import threading
+from persiantools import digits
+import webbrowser
+import time
+import signal
+import argparse
+from threading import Event
+import pychromecast
+from pychromecast.controllers.youtube import YouTubeController
 
 CLIENT_SECRETS_FILE = 'client_secret.json'
 
@@ -120,7 +128,8 @@ def create_live_broadcast(youtube, video_id, stream_id, title, description, thum
                 "privacyStatus": privacy
             },
             "contentDetails": {
-                "enableAutoStart": False
+                "enableAutoStart": False,
+                "latencyPreference": "ultraLow"
             }
         }
     )
@@ -190,7 +199,7 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', default=datetime.today().strftime('%Y-%m-%d'), help='date')
     parser.add_argument('--conf', default='config.json', help='config file')
-    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop".')
+    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser".')
     parser.add_argument('--azans', default=':'.join(['fajr', 'dhuhr', 'maghrib']), help='Colons seperated list of times to be shown in the stream. Options are "imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight".')
     
     args = parser.parse_args(args=argv)
@@ -199,6 +208,7 @@ def main(argv):
     file_ffplayout_config = "ffplayout2.yml"
     file_times_info = "azan-times.json"
     file_time_info = "time-info.txt"
+    file_translations = "time-translations.txt"
 
     with open(args.conf) as json_file:
         conf = json.load(json_file)
@@ -211,11 +221,16 @@ def main(argv):
     stream_id = None
     stream_url = None
 
+    time_translations = None
+    # time_translations["{HIJRI_DAY}"] = ;
+
     # subprocess.run("python gen-playlist.py --date $(date +\"%Y-%m-%d\") --conf network-program-hard.json > playlist4.json".split(' '))
     # with open('playlist4.json', "w") as outfile:
     #    subprocess.run(["python", "gen-playlist.py", "--date", datetime.today().strftime('%Y-%m-%d'), "--conf", "network-program-hard.json"], stdout=outfile)
     import gen_playlist
-    gen_playlist.main(["--date", args.date, "--conf", conf["program_template"], "--out", file_playlist, "--city", conf["city"], "--city_aviny", conf["city_aviny"], "--source", conf["source"], "--times", file_times_info])
+    gen_playlist_args = ["--date", args.date, "--conf", conf["program_template"], "--out", file_playlist, "--city", conf["city"], "--city_aviny", conf["city_aviny"], "--source", conf["source"], "--times", file_times_info] + (["--translations", file_translations] if time_translations is not None else [])
+    print(' '.join([str(x) for x in gen_playlist_args]))
+    gen_playlist.main(gen_playlist_args)
 
     # def update_remaining_info_file_thread(of_name, times):
     #     while True:
@@ -223,13 +238,14 @@ def main(argv):
     #         time.sleep(1)
 
     class CustomThread(threading.Thread):
-        def __init__(self, of_name, times, important_times):
+        def __init__(self, of_name, times, important_times, conf):
             super(CustomThread, self).__init__()
             self._stopper = threading.Event()
             self.of_name = of_name
             self.times = times
             self.important_times = important_times
             self.of_name_temp = 'temp_thread_time_info.txt'
+            self.translation = conf["translation"]
         
         def stop(self):
             self._stopper.set()
@@ -238,11 +254,15 @@ def main(argv):
             return self._stopper.is_set()
 
         def run(self):
+            def time_to_str(s):
+                if type(s) is not str: s = str(s)
+                return digits.en_to_fa(s)
             while not self.stopped():
                 try:
                     now = datetime.now()
                     # today = now.date()
                     # now = datetime(today.year, today.month, today.day, 0, 0, 0) + timedelta(seconds = int((now.second + now.microsecond / 1000000.0) * (24 * 60)))
+                    # now = now - timedelta(minutes=70)
                     today = now.date()
                     start = datetime(today.year, today.month, today.day)
                     prev, next, prev_title, next_title = None, None, None, None
@@ -254,14 +274,15 @@ def main(argv):
                     next_dist = (next - now).total_seconds() if next is not None else None
                     priv_print = False
                     # print(f"running {start} ({prev})<=({now})<=({next})")
-                    result = f"{now.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    result = f"{time_to_str(now.strftime('%Y-%m-%d %H:%M:%S'))}\n"
                     if prev_dist is not None and prev_dist < 60 * 30:
                         priv_print = True
-                        result += f"{prev_title.capitalize()}:{timedelta(seconds=prev_dist)}"
-                        result += " <- "
+                        result += "از "
+                        result += f"{prev_title.capitalize() if prev_title not in self.translation else self.translation[prev_title]}: {time_to_str(timedelta(seconds=int(prev_dist)))}"
+                        result += " "
                     if next is not None:
-                        result += "-> "
-                        result += f"{next_title.capitalize()}:{timedelta(seconds=next_dist)}"
+                        result += "تا "
+                        result += f"{next_title.capitalize() if next_title not in self.translation else self.translation[next_title]}: {time_to_str(timedelta(seconds=int(next_dist)))}"
                     # print(f"  {prev_title}:{prev_dist} {next_title}:{next_dist} == {result}")
                     with open(self.of_name_temp, 'w') as f:
                         print(result, file=f)
@@ -274,7 +295,7 @@ def main(argv):
                     print('ERROR!!!!!')
 
 
-    update_thread = CustomThread(file_time_info, json.load(open(file_times_info)), args.azans.split(':'))
+    update_thread = CustomThread(file_time_info, json.load(open(file_times_info)), args.azans.split(':'), conf)
     update_thread.start()
     # exit(0)
 
@@ -286,24 +307,29 @@ def main(argv):
         # Get the video ID
         video_id = get_video_id()
 
-        if args.out == "stream":
+        ffplayout_template = open(conf["ffplayout_template"], 'r').read()
+        with open(file_ffplayout_config, "w") as f:
+            f.write(ffplayout_template.replace('{STREAM_URL}', stream_url if stream_url is not None else ''))
+
+        if args.out == "desktop":
+            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "desktop", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+        # proc.communicate()
+
+        if args.out in ["stream", "browser", "chromecast"]:
             # Create a live stream
             stream_id, stream_url = create_live_stream(youtube, conf["title"], conf["description"])
             print(f"stream_id: {stream_id}, stream_url: {stream_url}")
+
+            with open(file_ffplayout_config, "w") as f:
+                f.write(ffplayout_template.replace('{STREAM_URL}', stream_url if stream_url is not None else ''))
 
             # Create a live broadcast
             broadcast_id = create_live_broadcast(youtube, video_id, stream_id, conf["title"], conf["description"], conf["thumbnails"], conf["privacy"])
             print(f"broadcast_id: {broadcast_id} url=https://youtu.be/{broadcast_id}")
 
-        ffplayout_template = open(conf["ffplayout_template"], 'r').read()
-        with open(file_ffplayout_config, "w") as f:
-            f.write(ffplayout_template.replace('{STREAM_URL}', stream_url if stream_url is not None else ''))
-        
-        proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", args.out, "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
-        # proc.communicate()
-
-        if args.out == "stream":
+            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
             # wait_for_stream_ready(youtube, stream_id)
+
             wait_for(lambda: get_stream_status(youtube, stream_id) == "active")
 
             # # Start the live broadcast
@@ -314,11 +340,50 @@ def main(argv):
             wait_for(lambda:get_broadcast_status(youtube, broadcast_id) == "live")
 
             print("Live broadcast has been successfully started.")
-            print(f"Now you can open https://youtu.be/{broadcast_id}")
+
+            if args.out == "chromecast":
+                # It doesn't work.
+                try:
+                    # A list of Chromecast devices broadcasting
+                    chromecast_devices = pychromecast.get_chromecasts()
+
+                    # Initialize a connection to the Chromecast
+                    cast = chromecast_devices[0][0]
+                    # cast = pychromecast.get_chromecast(friendly_name=cast_device)
+
+                    # Create and register a YouTube controller
+                    yt = YouTubeController()
+                    cast.register_handler(yt)
+                    cast.wait()
+
+                    print('Waiting for connection ...')
+                    cnt = 0
+                    while cast.socket_client.is_connected == False and cnt < 10:
+                        print(cnt, cast.status, cast.socket_client)
+                        time.sleep(1)
+                        cnt += 1
+                    print('Waiting for connection done')
+
+                    # Play the video ID we've been given
+                    yt.play_video(broadcast_id)
+
+                    print("Streaming %s to %s" % (broadcast_id, cast))
+                except pychromecast.error.PyChromecastError as e:
+                    print(f"We couldn't open chromecast, but use https://youtu.be/{broadcast_id}")    
+            
+            elif args.out == "browser":
+                webbrowser.open(f"https://youtu.be/{broadcast_id}", new=0, autoraise=True)
+            
+            else:
+                print(f"Now open this link https://youtu.be/{broadcast_id}")
+
 
         proc.wait()
     except KeyboardInterrupt as e:
         print("Done")
+    except BaseException as e:
+        print(f"Error: {e}")
+        raise e
     finally:
         if broadcast_id and (get_broadcast_status(youtube, broadcast_id) in ["live", "testing"]):
             broadcast_transition(youtube, broadcast_id, "complete")

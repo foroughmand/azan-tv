@@ -3,24 +3,24 @@
     "program": [
         {
             "name": "imsak",
-            "pre": ["media/dua-abuzar-thomali.mp4", "media/dua-sahar.m4v"],
-            "post": ["media/azan-moazzenzadeh.mkv", "media/azoma-albala.mkv"]
+            "pre": ["media/dua-sahar", "media/dua-abuzar-thomali", "media/pre-azan-sobh"],
+            "post": ["media/azan-moazzenzadeh", "media/namaz-sobh-mr-makarem", "media/azoma-albala"]
         },
         {
             "name": "fajr",
             "pre": [],
-            "post": ["media/azan-moazzenzadeh.mkv", "media/azoma-albala.mkv"]
+            "post": ["media/azan-moazzenzadeh", "media/azoma-albala"]
         },
         {
             "name": "dhuhr",
-            "pre": ["media/maryam-.mp4", "media/ya-zaljalal.mp4"],
-            "post": ["media/azan-moazzenzadeh.mkv", "media/azoma-albala.mkv", "media/doa-noor.mkv"]
+            "pre": ["media/maryam-", "media/ya-zaljalal"],
+            "post": ["media/azan-moazzenzadeh", "media/azoma-albala", "media/doa-noor"]
         },
         {
             "name": "maghrib",
-            "pre": ["media/quran-j18.mkv", "media/taha-abkar.mkv", "media/asma-alhosna.mp4"],
-            "post": ["media/azan-moazzenzadeh.mkv", "media/bird1.mp4", "media/bird2.mkv", "media/ya-ali-ya-azim.mkv", "media/allahomma-laka-somna.mkv", "media/dua-faraj.mkv", "media/doa-iftitah.mkv"]
+            "pre": ["media/quran-j25", "media/taha-abkar", "media/asma-alhosna"],
+            "post": ["media/azan-moazzenzadeh", "media/bird1", "media/bird2", "media/ya-ali-ya-azim", "media/allahomma-laka-somna", "media/dua-faraj", "media/doa-iftitah"]
         }
     ],
-    "timer": "media/timer.mp4"
+    "timer": "media/timer"
 }

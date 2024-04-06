@@ -64,7 +64,7 @@ storage:
   help_text: |
     'filler' is for playing instead of a missing file or fill the end to reach 24 hours, can be a file or folder, it will loop when is necessary. 'extensions' search only files with this extension. Set 'shuffle' to 'true' to pick files randomly.
   path: .
-  filler: /var/lib/ffplayout/tv-media/filler/filler.mp4
+  filler: media/timer.mp4
   extensions:
   - mp4
   - mkv
@@ -72,7 +72,7 @@ storage:
 text:
   help_text: Overlay text in combination with libzmq for remote text manipulation. On windows fontfile path need to be like this 'C\:/WINDOWS/fonts/DejaVuSans.ttf'. 'text_from_filename' activate the extraction from text of a filename. With 'style' you can define the drawtext parameters like position, color, etc. Post Text over API will override this. With 'regex' you can format file names, to get a title from it.
   add_text: true
-  fontfile: /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+  fontfile: HM_XNiloofar.ttf
   text_from_filename: false
   style: x=(w-tw)/2:y=(h-line_h)*0.9:fontsize=24:fontcolor=#ffffff:box=1:boxcolor=#000000:boxborderw=4
   regex: ==file==time-info.txt

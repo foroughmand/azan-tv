@@ -41,6 +41,7 @@ import requests
 import urllib.parse
 from geopy.geocoders import Nominatim
 from tzfpy import get_tz, get_tzs
+import os
 
 #----------------------- PrayTimes Class ------------------------
 
@@ -424,13 +425,36 @@ def get_video_duration(fn):
 def f_to_hms(x):
     return str(datetime.timedelta(seconds=x))[:-3]
 
-def gen(azan_times, program, timer_file):
+def apply_replacements(lst: list[str], replacements: dict[str, str]):
+    r = []
+    for l in lst:
+        rl = l
+        for a, b in replacements.items():
+            if rl.find(a):
+                rl = rl.replace(a, b)
+
+        for ext in ['', '.mkv', '.mp4', '.m4v', '.webm']:
+            if os.path.isfile(rl + ext):
+                rl = rl + ext
+                break
+        if not os.path.isfile(rl):
+            raise RuntimeError(f"File '{rl}' with non of the extensions exists.")
+        r.append(rl)
+    print(f"File names: {r}", file=sys.stderr)
+    return r
+
+def gen(azan_times, program, timer_file, replacements):
+    print(f"gen {program} timer_file:{timer_file}", file=sys.stderr)
+    timer_file = apply_replacements([timer_file], replacements)[0]
     timer_duration = get_video_duration(timer_file)
     r = []
 
     filled = 0
     for p in program:
+        print(f"Program {p}", file=sys.stderr)
         name = p['name']
+        p['pre'] = apply_replacements(p['pre'], replacements)
+        p['post'] = apply_replacements(p['post'], replacements)
         pre_durations = np.array([get_video_duration(f) for f in p['pre']])
         post_durations = np.array([get_video_duration(f) for f in p['post']])
     
@@ -487,10 +511,16 @@ def main(argv):
     parser.add_argument('--source', default='aviny:izhamburg', help='A colon separated list of sources to be included in calculation. Items are "prayertimes", "avini", "izhamburg".')
     parser.add_argument('--times', help='Calculated times are saving into this file.')
     parser.add_argument('--out', default='-', help='File for saving the program to. "-" for standard output.')
+    parser.add_argument('--replacements', help='replacement file')
     args = parser.parse_args(args=argv)
 
     with open(args.conf) as json_file:
         conf = json.load(json_file)
+
+    replacements = {}
+    if args.replacements:
+        with open(args.replacements) as f:
+            replacements = json.load(f)
 
     azan = 0
 
@@ -557,7 +587,7 @@ def main(argv):
 
     print('azan {} {}'.format(azan, {o:f_to_hms(v) for o, v in azan.items()}), file=sys.stderr)
 
-    program = gen(azan, conf['program'], conf['timer'])
+    program = gen(azan, conf['program'], conf['timer'], replacements)
     j = gen_text(args.city + " Azan", args.date, program)
 
     with open(args.out, 'w') if args.out != '-' else sys.stdout as f:
