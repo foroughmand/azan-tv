@@ -8,10 +8,11 @@ git clone git@github.com:foroughmand/azan-tv.git
 cd azan-tv
 ```
 
-The main streaming part is done via ffplayout which we have modified it a little to support customizable text overlay feature of ffmpeg. You can get and build the ffplayout with the following command.
+The main streaming part is done via ffplayout which we have modified it a little to support customizable text overlay feature of ffmpeg. You can get and build the ffplayout with the following command. For this step, [rust](https://doc.rust-lang.org/cargo/getting-started/installation.html) should be installed.
 ```
 git clone git@github.com:foroughmand/ffplayout.git
 cd ffplayout
+cargo update time
 cargo build
 cd ..
 ```
