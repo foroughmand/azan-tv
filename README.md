@@ -55,7 +55,8 @@ Then download files mentioned in the current network program with the following 
 ```
 bin/yt-dlp https://www.youtube.com/watch?v=ZM1VANg8H9E -f mp4 -o media/timer.mp4
 bin/yt-dlp https://www.youtube.com/watch?v=y07yhEFsMeU -f mp4 -o media/dua-sahar.mp4
-bin/yt-dlp https://www.youtube.com/watch?v=_hT_db_WqMo -f mp4 -o media/dua-thomali.mp4
+#bin/yt-dlp https://www.youtube.com/watch?v=_hT_db_WqMo -f mp4 -o media/dua-thomali.mp4
+bin/yt-dlp https://www.youtube.com/watch?v=aJgD-438KVY -f mp4 -o media/dua-thomali.mp4
 bin/yt-dlp https://telewebion.com/episode/0x5fbb24f -o media/pre-azan-sobh.mp4
 bin/yt-dlp https://www.aparat.com/v/g661dhy -o media/azan-moazzenzadeh.mp4
 bin/yt-dlp https://telewebion.com/episode/0xec0945e -o media/namaz-sobh-mr-makarem.mp4
@@ -66,10 +67,12 @@ bin/yt-dlp https://www.youtube.com/watch?v=5k2hw5I9ULk -f mp4 -o media/ya-zaljal
 bin/yt-dlp https://telewebion.com/episode/0x5282c43 -o media/doa-noor.mp4
 bin/yt-dlp https://www.youtube.com/watch?v=us7h-oKCrtA -f mp4 -o media/quran-taha-abkar.mp4
 bin/yt-dlp https://www.youtube.com/watch?v=e-KygsbNVGk -f mp4 -o media/asma-alhosna.mp4
-bin/yt-dlp https://www.youtube.com/watch?v=zP7TepK7eAs -f mp4 -o media/nature.mp4
+#bin/yt-dlp https://www.youtube.com/watch?v=zP7TepK7eAs -f mp4 -o media/nature.mp4
+bin/yt-dlp https://www.youtube.com/watch?v=3gu9FqQZTBA -f mp4 -o media/nature.mp4
 # https://www.youtube.com/watch?v=K4TYdm34c7g
 bin/yt-dlp https://www.youtube.com/watch?v=psZQ8oacGds -f mp4 -o media/ya-ali-ya-azim.mp4
-bin/yt-dlp https://www.youtube.com/watch?v=Wg6ZtFidpmo -f mp4 -o media/allahomma-laka-somna.mp4
+bin/yt-dlp https://telewebion.com/episode/0x1b3a9a3 -o media/allahomma-laka-somna.mp4
+# bin/yt-dlp https://www.youtube.com/watch?v=Wg6ZtFidpmo -f mp4 -o media/allahomma-laka-somna.mp4
 # https://www.aparat.com/v/vpudb9r
 bin/yt-dlp https://telewebion.com/episode/0x1bd9a01 -o media/dua-faraj.mp4
 bin/yt-dlp https://www.youtube.com/watch?v=0A3fqGjYFkE -f mp4 -o media/doa-iftitah.mp4
