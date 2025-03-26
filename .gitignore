@@ -11,3 +11,5 @@ devel
 **/*.swp
 *-debug/*.swp
 *-debug/
+bin/
+ffplayout/

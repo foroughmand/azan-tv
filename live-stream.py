@@ -19,6 +19,9 @@ import argparse
 from threading import Event
 import pychromecast
 from pychromecast.controllers.youtube import YouTubeController
+import threading
+import http.server
+import socketserver
 
 CLIENT_SECRETS_FILE = 'client_secret.json'
 
@@ -129,6 +132,7 @@ def create_live_broadcast(youtube, video_id, stream_id, title, description, thum
             },
             "contentDetails": {
                 "enableAutoStart": False,
+                "enableDvr": True,
                 "latencyPreference": "ultraLow"
             }
         }
@@ -187,6 +191,20 @@ def broadcast_transition(youtube, broadcast_id, new_status):
     response = request.execute()
     # print(response)
 
+import socket
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        # doesn't even have to be reachable
+        s.connect(('10.254.254.254', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 # OTHER METHODS:
 #   ffplayout: main method (https://github.com/ffplayout/ffplayout)
 #   creating new live: (https://github.com/youtube/api-samples/blob/master/python/add_featured_video.py)
@@ -199,9 +217,12 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', default=datetime.today().strftime('%Y-%m-%d'), help='date')
     parser.add_argument('--conf', default='config.json', help='config file')
-    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser".')
+    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser", "tv".')
     parser.add_argument('--azans', default=':'.join(['fajr', 'dhuhr', 'maghrib']), help='Colons seperated list of times to be shown in the stream. Options are "imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight".')
-    
+    parser.add_argument('--debug-time-diff', type=int, default=0, help='This will be added to the actual time (minutes)')
+    parser.add_argument('--ip', type=str, default=get_local_ip(), help='IP used by local http server (for chromecast).')
+    parser.add_argument('--port', type=int, default=8080, help='Port used by local http server (for chromecast).')
+
     args = parser.parse_args(args=argv)
 
     file_playlist = "playlist4.json"
@@ -209,6 +230,7 @@ def main(argv):
     file_times_info = "azan-times.json"
     file_time_info = "time-info.txt"
     file_translations = "time-translations.txt"
+    file_stream = "tmp/stream.m3u8"
 
     with open(args.conf) as json_file:
         conf = json.load(json_file)
@@ -228,7 +250,8 @@ def main(argv):
     # with open('playlist4.json', "w") as outfile:
     #    subprocess.run(["python", "gen-playlist.py", "--date", datetime.today().strftime('%Y-%m-%d'), "--conf", "network-program-hard.json"], stdout=outfile)
     import gen_playlist
-    gen_playlist_args = ["--date", args.date, "--conf", conf["program_template"], "--out", file_playlist, "--city", conf["city"], "--city_aviny", conf["city_aviny"], "--source", conf["source"], "--times", file_times_info] + (["--translations", file_translations] if time_translations is not None else [])
+    gen_playlist_args = ["--date", args.date, "--conf", conf["program_template"], "--out", file_playlist, "--city", conf["city"], "--city_aviny", conf["city_aviny"], "--source", conf["source"], "--times", file_times_info] + (["--translations", file_translations] if time_translations is not None else []) + ["--debug-time-diff", args.debug_time_diff] 
+    #+ ["--azan", "imsak:03:00:00,"+"fajr:"+(datetime.now() + timedelta(minutes=-5)).time().strftime('%H:%M:%S')+",dhuhr:12:00:00,"+"maghrib:20:00:00"]
     print(' '.join([str(x) for x in gen_playlist_args]))
     gen_playlist.main(gen_playlist_args)
 
@@ -263,6 +286,7 @@ def main(argv):
                     # today = now.date()
                     # now = datetime(today.year, today.month, today.day, 0, 0, 0) + timedelta(seconds = int((now.second + now.microsecond / 1000000.0) * (24 * 60)))
                     # now = now - timedelta(minutes=70)
+                    now = now + timedelta(minutes=args.debug_time_diff)
                     today = now.date()
                     start = datetime(today.year, today.month, today.day)
                     prev, next, prev_title, next_title = None, None, None, None
@@ -290,14 +314,36 @@ def main(argv):
                     time.sleep(0.3)
                     # return
                 except Exception as e:
-                    print(e)
+                    print('CustomThread', e)
                 except:
                     print('ERROR!!!!!')
 
 
     update_thread = CustomThread(file_time_info, json.load(open(file_times_info)), args.azans.split(':'), conf)
     update_thread.start()
-    # exit(0)
+
+
+    def start_http_server(ip, port):
+        """Starts a simple HTTP server in a separate thread."""
+        from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+        class CORSRequestHandler(SimpleHTTPRequestHandler):
+            def end_headers(self):
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+                self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+                super().end_headers()
+                
+        # handler = http.server.SimpleHTTPRequestHandler
+        # with socketserver.TCPServer((ip, port), handler) as httpd:
+        #     print(f"🌍 Serving HTTP on http://{ip}:{port}/")
+        #     httpd.serve_forever()
+
+        httpd = HTTPServer((ip, port), CORSRequestHandler)
+        print(f"🌍 Serving HTTP on http://{ip}:{port}/")
+        httpd.serve_forever()
+
+    http_thread = threading.Thread(target=start_http_server, args=(args.ip, args.port), daemon=True)
 
     youtube, youtube_partner = get_authenticated_service()
 
@@ -305,26 +351,36 @@ def main(argv):
     try:
         # source: https://stackoverflow.com/a/35083880/9904290
         # Get the video ID
-        video_id = get_video_id()
+        # video_id = get_video_id()
+
 
         ffplayout_template = open(conf["ffplayout_template"], 'r').read()
         with open(file_ffplayout_config, "w") as f:
-            f.write(ffplayout_template.replace('{STREAM_URL}', stream_url if stream_url is not None else ''))
+            # ffplayout_config = ffplayout_template
+            # if args.out in ["desktop", "stream", "browser"]:
+            #     ffplayout_config = ffplayout_config.replace('-f flv {STREAM_URL}', stream_url if stream_url is not None else '')
+            # elif args.out == "chromecast":
+            #     ffplayout_config = ffplayout_config.replace('-f hls {STREAM_URL}', stream_url if stream_url is not None else '')
+            # else:
+            #     raise RuntimeError("Invalid args.out=" + args.out)
+            f.write(ffplayout_template)
 
         if args.out == "desktop":
+            print("running ffplayout")
             proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "desktop", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+            print("We will wait for ffplayout", proc)
         # proc.communicate()
-
-        if args.out in ["stream", "browser", "chromecast"]:
+        elif args.out in ["stream", "browser"]:
+            
             # Create a live stream
             stream_id, stream_url = create_live_stream(youtube, conf["title"], conf["description"])
             print(f"stream_id: {stream_id}, stream_url: {stream_url}")
 
             with open(file_ffplayout_config, "w") as f:
-                f.write(ffplayout_template.replace('{STREAM_URL}', stream_url if stream_url is not None else ''))
+                f.write(ffplayout_template.replace('{STREAM_URL}', ('-f flv ' + stream_url) if stream_url is not None else ''))
 
             # Create a live broadcast
-            broadcast_id = create_live_broadcast(youtube, video_id, stream_id, conf["title"], conf["description"], conf["thumbnails"], conf["privacy"])
+            broadcast_id = create_live_broadcast(youtube, None, stream_id, conf["title"], conf["description"], conf["thumbnails"], conf["privacy"])
             print(f"broadcast_id: {broadcast_id} url=https://youtu.be/{broadcast_id}")
 
             proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
@@ -341,42 +397,137 @@ def main(argv):
 
             print("Live broadcast has been successfully started.")
 
-            if args.out == "chromecast":
-                # It doesn't work.
-                try:
-                    # A list of Chromecast devices broadcasting
-                    chromecast_devices = pychromecast.get_chromecasts()
+            # if args.out == "chromecast":
+            #     # It doesn't work.
+            #     try:
+            #         # A list of Chromecast devices broadcasting
+            #         chromecast_devices = pychromecast.get_chromecasts()
 
-                    # Initialize a connection to the Chromecast
-                    cast = chromecast_devices[0][0]
-                    # cast = pychromecast.get_chromecast(friendly_name=cast_device)
+            #         # Initialize a connection to the Chromecast
+            #         cast = chromecast_devices[0][0]
+            #         # cast = pychromecast.get_chromecast(friendly_name=cast_device)
 
-                    # Create and register a YouTube controller
-                    yt = YouTubeController()
-                    cast.register_handler(yt)
-                    cast.wait()
+            #         # Create and register a YouTube controller
+            #         yt = YouTubeController()
+            #         cast.register_handler(yt)
+            #         cast.wait()
 
-                    print('Waiting for connection ...')
-                    cnt = 0
-                    while cast.socket_client.is_connected == False and cnt < 10:
-                        print(cnt, cast.status, cast.socket_client)
-                        time.sleep(1)
-                        cnt += 1
-                    print('Waiting for connection done')
+            #         print('Waiting for connection ...')
+            #         cnt = 0
+            #         while cast.socket_client.is_connected == False and cnt < 10:
+            #             print(cnt, cast.status, cast.socket_client)
+            #             time.sleep(1)
+            #             cnt += 1
+            #         print('Waiting for connection done')
 
-                    # Play the video ID we've been given
-                    yt.play_video(broadcast_id)
+            #         # Play the video ID we've been given
+            #         yt.play_video(broadcast_id)
 
-                    print("Streaming %s to %s" % (broadcast_id, cast))
-                except pychromecast.error.PyChromecastError as e:
-                    print(f"We couldn't open chromecast, but use https://youtu.be/{broadcast_id}")    
+            #         print("Streaming %s to %s" % (broadcast_id, cast))
+            #     except pychromecast.error.PyChromecastError as e:
+            #         print(f"We couldn't open chromecast, but use https://youtu.be/{broadcast_id}")    
             
-            elif args.out == "browser":
+            # elif 
+            if args.out == "browser":
                 webbrowser.open(f"https://youtu.be/{broadcast_id}", new=0, autoraise=True)
             
             else:
                 print(f"Now open this link https://youtu.be/{broadcast_id}")
+        elif args.out == "chromecast":
+            import logging
+            logging.basicConfig(level=logging.DEBUG)
 
+            with open(file_ffplayout_config, "w") as f:
+                f.write(ffplayout_template.replace('{STREAM_URL}', '-f hls ' + file_stream))
+            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+
+            http_thread.start()
+
+            def cast_stream(device_name, stream_url):
+                """Finds Chromecast and plays the provided stream URL."""
+                print("🔍 Searching for Chromecast devices...")
+                chromecasts, browser = pychromecast.get_listed_chromecasts(
+                    friendly_names=[device_name], known_hosts=""
+                )
+                if not chromecasts:
+                    print(f'No chromecast with name "{device_name}" discovered')
+                    sys.exit(1)
+
+                cast = chromecasts[0]
+                # chromecasts, browser = pychromecast.get_chromecasts()
+
+                # Find the correct Chromecast
+                # cast = next((cc for cc in chromecasts if cc.cast_info.friendly_name == device_name), None)
+                # if not cast:
+                #     print(f"❌ Chromecast '{device_name}' not found.")
+                #     return
+
+                print(f"✅ Found Chromecast: {cast.cast_info.friendly_name}. Connecting...")
+                cast.wait()
+
+                # Play the stream
+                print(f"▶ Casting stream: {stream_url}")
+
+
+                # If an app is running, stop it
+                while cast.app_id:
+                    print("Stopping current app...")
+                    cast.quit_app()
+                    time.sleep(1)
+
+
+                # Get media controller
+                mc = cast.media_controller
+
+
+                # Check current app status
+                print(f"Current app ID: {cast.app_id}, Status: {cast.status}")
+
+                # print()
+                # print(cast.cast_info)
+                # time.sleep(1)
+                # print()
+                # print(cast.status)
+                # print()
+                # print(cast.media_controller.status)
+                # print()
+
+                # if not cast.is_idle:
+                #     print("Killing current running app")
+                #     cast.quit_app()
+                #     t = 5.0
+                #     while cast.status.app_id is not None and t > 0:  # type: ignore[union-attr]
+                #         time.sleep(0.1)
+                #         t = t - 0.1
+
+                # cast.media_controller.play_media(stream_url, "application/x-mpegURL")
+                # cast.media_controller.block_until_active()
+                print(f"stream_url: {stream_url}")
+                # stream_url = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+
+                cast.play_media(stream_url, "video/mp4")
+                mc.block_until_active()  # Wait until the media starts
+                # time.sleep(2)  # Give it some time to start
+                mc.play()
+
+                # Stop discovery to free resources
+                browser.stop_discovery()
+                print("✅ Streaming should be playing on your TV!")
+            # cast_stream("Sony", f"http://{args.ip}:{args.port}/" + file_stream)
+        elif args.out == "tv":
+            mediamtx_proc = subprocess.Popen(["bin/mediamtx", "bin/mediamtx.yml"])
+            time.sleep(2)
+
+            import logging
+            logging.basicConfig(level=logging.DEBUG)
+
+            file_stream = f"rtsp://{args.ip}:{args.port}/live"
+
+            with open(file_ffplayout_config, "w") as f:
+                f.write(ffplayout_template.replace('{STREAM_URL}', '-f rtsp ' + file_stream))
+            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+
+            print(f'Live url: {file_stream}. You can open this link.')
 
         proc.wait()
     except KeyboardInterrupt as e:
@@ -395,6 +546,10 @@ def main(argv):
             proc.terminate()
         if update_thread:
             update_thread.stop()
+        if mediamtx_proc and mediamtx_proc is not None:
+            mediamtx_proc.terminate()
+        # if http_thread:
+        #     http_thread.stop()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

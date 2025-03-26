@@ -438,12 +438,12 @@ def apply_replacements(lst: list[str], replacements: dict[str, str]):
                 rl = rl + ext
                 break
         if not os.path.isfile(rl):
-            raise RuntimeError(f"File '{rl}' with non of the extensions exists.")
+            raise RuntimeError(f"File '{rl}' with none of the extensions exists.")
         r.append(rl)
     print(f"File names: {r}", file=sys.stderr)
     return r
 
-def gen(azan_times, program, timer_file, replacements):
+def gen(azan_times, program, timer_file, replacements, args):
     print(f"gen {program} timer_file:{timer_file}", file=sys.stderr)
     timer_file = apply_replacements([timer_file], replacements)[0]
     timer_duration = get_video_duration(timer_file)
@@ -459,8 +459,10 @@ def gen(azan_times, program, timer_file, replacements):
         post_durations = np.array([get_video_duration(f) for f in p['post']])
     
         start = azan_times[name] - pre_durations.sum()
+        start -= args.debug_time_diff * 60
+        # print('gen', azan_times[name] - pre_durations.sum(), start, args.debug_time_diff)
     
-        r.append((filled, start, timer_duration, timer_file))
+        r.append((filled + 60 * args.debug_time_diff, start, timer_duration, timer_file))
         pre_info = [(0, d, d, f) for f, d, x in zip(p['pre'], pre_durations, [0] + pre_durations.cumsum().tolist()[:-1])]
         r.extend(pre_info)
         post_info = [(0, d, d, f) for f, d, x in zip(p['post'], post_durations, [0] + post_durations.cumsum().tolist()[:-1])]
@@ -512,6 +514,7 @@ def main(argv):
     parser.add_argument('--times', help='Calculated times are saving into this file.')
     parser.add_argument('--out', default='-', help='File for saving the program to. "-" for standard output.')
     parser.add_argument('--replacements', help='replacement file')
+    parser.add_argument('--debug-time-diff', type=int, default=0, help='This will be added to the actual time (minutes)')
     args = parser.parse_args(args=argv)
 
     with open(args.conf) as json_file:
@@ -521,7 +524,6 @@ def main(argv):
     if args.replacements:
         with open(args.replacements) as f:
             replacements = json.load(f)
-
     azan = 0
 
     if args.azan is not None:
@@ -556,6 +558,11 @@ def main(argv):
 
         url = f'https://prayer.aviny.com/api/prayertimes/{args.city_aviny}'
         r = requests.get(url).json()
+        # print('r', r)
+        replacements['{HIJRI_DAY}'] = r['TodayQamari'].split('/')[2]
+        replacements['{HIJRI_MONTH}'] = r['TodayQamari'].split('/')[1]
+        replacements['{HIJRI_YEAR}'] = r['TodayQamari'].split('/')[0]
+
         azan_r = {'imsak': r['Imsaak'], 'fajr': r['Imsaak'], 'sunrise': r['Sunrise'], 
                 'dhuhr': r['Noon'], 'asr': r['Noon'], 'sunset': r['Sunset'], 
                 'maghrib': r['Maghreb'], 'isha': r['Maghreb'], 'midnight': r['Midnight']}
@@ -587,7 +594,7 @@ def main(argv):
 
     print('azan {} {}'.format(azan, {o:f_to_hms(v) for o, v in azan.items()}), file=sys.stderr)
 
-    program = gen(azan, conf['program'], conf['timer'], replacements)
+    program = gen(azan, conf['program'], conf['timer'], replacements, args)
     j = gen_text(args.city + " Azan", args.date, program)
 
     with open(args.out, 'w') if args.out != '-' else sys.stdout as f:

@@ -34,6 +34,21 @@ python live-stream.py --out desktop
 
 Without the `--out` option, the program creates a new live stream on Youtube and its url with be displayed at the end.
 
+## Installing mediamtx
+Install mediamtx (for low latency version, `--out tv`):
+```
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.11.3/mediamtx_v1.11.3_linux_amd64.tar.gz
+mkdir -p bin
+cd bin/
+tar xzf ../mediamtx_v1.11.3_linux_amd64.tar.gz
+cd ..
+```
+
+Run the application
+```
+python live-stream.py --out tv --port 8554
+```
+
 # Configuration (setting the location)
 Configurations are located at file [config.json](config.json). 
 * `city`: Name of the city. After searching it in map services, lat and long of the city is retrieved and prayer times are retrieved from izhamburg website.

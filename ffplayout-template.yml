@@ -82,4 +82,6 @@ task:
 out:
   help_text: The final playout compression. Set the settings to your needs. 'mode' has the options 'desktop', 'hls', 'null', 'stream'. Use 'stream' and adjust 'output_param:' settings when you want to stream to a rtmp/rtsp/srt/... server. In production don't serve hls playlist with ffpapi, use nginx or another web server!
   mode: stream
-  output_param: -c:v libx264 -crf 23 -x264-params keyint=50:min-keyint=25:scenecut=-1 -maxrate 1300k -bufsize 2600k -preset faster -tune zerolatency -profile:v Main -level 3.1 -c:a aac -ar 44100 -b:a 128k -flags +cgop -f flv {STREAM_URL}
+    #output_param: -c:v libx264 -crf 23 -x264-params keyint=50:min-keyint=25:scenecut=-1 -maxrate 1300k -bufsize 2600k -preset faster -tune zerolatency -profile:v Main -level 3.1 -c:a aac -ar 44100 -b:a 128k -flags +cgop {STREAM_URL}
+    #ffmpeg -re -i media/quran-j22.mp4 -vf "drawtext=text='%{pts\:hms}':fontsize=24:fontcolor=white:x=10:y=10" -c:v libx264 -g 1 -keyint_min 30 -sc_threshold 0 -preset ultrafast -tune zerolatency -f rtsp rtsp://192.168.178.68:8554/live
+  output_param: -c:v libx264 -g 30 -keyint_min 30 -sc_threshold 0 -preset superfast -tune fastdecode {STREAM_URL}

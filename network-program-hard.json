@@ -3,23 +3,23 @@
     "program": [
         {
             "name": "imsak",
-            "pre": ["media/dua-sahar", "media/dua-abuzar-thomali", "media/pre-azan-sobh"],
+            "pre": ["media/dua-thomali", "media/pre-azan-sobh"],
             "post": ["media/azan-moazzenzadeh", "media/namaz-sobh-mr-makarem", "media/azoma-albala"]
         },
         {
             "name": "fajr",
-            "pre": [],
+            "pre": ["media/dua-sahar", "media/dua-thomali", "media/pre-azan-sobh"],
             "post": ["media/azan-moazzenzadeh", "media/azoma-albala"]
         },
         {
             "name": "dhuhr",
-            "pre": ["media/maryam-", "media/ya-zaljalal"],
+            "pre": ["media/quran-maryam", "media/ya-zaljalal"],
             "post": ["media/azan-moazzenzadeh", "media/azoma-albala", "media/doa-noor"]
         },
         {
             "name": "maghrib",
-            "pre": ["media/quran-j25", "media/taha-abkar", "media/asma-alhosna"],
-            "post": ["media/azan-moazzenzadeh", "media/bird1", "media/bird2", "media/ya-ali-ya-azim", "media/allahomma-laka-somna", "media/dua-faraj", "media/doa-iftitah"]
+            "pre": ["media/quran-j{HIJRI_DAY}", "media/quran-taha-abkar", "media/asma-alhosna"],
+            "post": ["media/azan-moazzenzadeh", "media/nature", "media/ya-ali-ya-azim", "media/allahomma-laka-somna", "media/dua-faraj", "media/doa-iftitah"]
         }
     ],
     "timer": "media/timer"
