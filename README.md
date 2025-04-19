@@ -49,6 +49,36 @@ Run the application
 python live-stream.py --out tv --port 8554
 ```
 
+# Output options:
+
+## TV
+This will run MediaMTX locally, then opens VLC on the TV playing the MediaMTX url. For this, MediaMTX should be installed locally on `bin/mediamtx`, VLC should be installed on the TV, ADB Debugging should be enabled on the TV, pure-python-adb package should be installed locally.
+
+To install MediaMTX, download the appropriate standalone file from this [reposiotry](https://github.com/bluenviron/mediamtx) and put it as `bin/mediamtx`.
+```
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.12.0/mediamtx_v1.12.0_linux_amd64.tar.gz
+tar xzf mediamtx_v1.12.0_linux_amd64.tar.gz
+rm LICENSE
+mkdir -p bin/
+mv mediamtx mediamtx.yml bin/
+```
+
+Install `pure-python-adb` with
+```
+pip install pure-python-adb
+```
+
+### How to Enable ADB on Sony BRAVIA TV (2024+ models):
+Enable Developer Options:
+* Go to Settings → System → About → Build Number.
+* Click "Build Number" 7 times until it says "You are now a developer."
+
+Enable ADB Debugging:
+* Go back to Settings → System → Developer Options.
+* Find and turn ON:
+  * USB Debugging
+  * Network Debugging (or ADB over Network).
+
 # Configuration (setting the location)
 Configurations are located at file [config.json](config.json). 
 * `city`: Name of the city. After searching it in map services, lat and long of the city is retrieved and prayer times are retrieved from izhamburg website.

@@ -217,11 +217,12 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', default=datetime.today().strftime('%Y-%m-%d'), help='date')
     parser.add_argument('--conf', default='config.json', help='config file')
-    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser", "tv".')
+    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser", "tv": runs local MediaMTX server and opens VLC on the TV on the appropriate url.')
     parser.add_argument('--azans', default=':'.join(['fajr', 'dhuhr', 'maghrib']), help='Colons seperated list of times to be shown in the stream. Options are "imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight".')
     parser.add_argument('--debug-time-diff', type=int, default=0, help='This will be added to the actual time (minutes)')
     parser.add_argument('--ip', type=str, default=get_local_ip(), help='IP used by local http server (for chromecast).')
     parser.add_argument('--port', type=int, default=8080, help='Port used by local http server (for chromecast).')
+    parser.add_argument('--tv-name', default="Sony", help='Friendly name of TV for playing on it (for chromecast/TV).')
 
     args = parser.parse_args(args=argv)
 
@@ -513,7 +514,7 @@ def main(argv):
                 # Stop discovery to free resources
                 browser.stop_discovery()
                 print("✅ Streaming should be playing on your TV!")
-            # cast_stream("Sony", f"http://{args.ip}:{args.port}/" + file_stream)
+            # cast_stream(args.tv_name, f"http://{args.ip}:{args.port}/" + file_stream)
         elif args.out == "tv":
             mediamtx_proc = subprocess.Popen(["bin/mediamtx", "bin/mediamtx.yml"])
             time.sleep(2)
@@ -528,6 +529,74 @@ def main(argv):
             proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
 
             print(f'Live url: {file_stream}. You can open this link.')
+
+            def find_tv_via_chromecast(device_name):
+                """
+                Discovers Chromecast devices on the network, returns their IP addresses.
+                """
+                print(f"Discovering Chromecast devices {device_name}...")
+                chromecasts, browser = pychromecast.get_listed_chromecasts(
+                    friendly_names=[device_name], known_hosts=""
+                )
+
+                if not chromecasts:
+                    print(f'No chromecast with name "{device_name}" discovered')
+                    sys.exit(1)
+
+                cast = chromecasts[0]
+
+                # tvs = []
+                for cc in chromecasts:
+                    print(f"Found device: {cc.cast_info.friendly_name} at {cc.cast_info.host}")
+                    # tvs[cc.cast_info.friendly_name] = cc.cast_info.host
+                    return cc.cast_info.host
+                # return tvs
+                # return list(tvs.values)
+
+
+            from ppadb.client import Client as AdbClient
+
+            def play_stream_on_tv_pure(tv_ip, stream_url):
+                """
+                Connects to the Sony BRAVIA TV over ADB natively from Python and plays a stream URL in VLC.
+
+                Args:
+                    tv_ip (str): IP address of the TV (without port, just IP like '192.168.178.61').
+                    stream_url (str): The streaming URL to open in VLC.
+                """
+
+                # Start ADB client
+                client = AdbClient(host="127.0.0.1", port=5037)  # Local adb server
+
+                # Connect to the TV
+                print(f"Connecting to {tv_ip}:5555...")
+                client.remote_connect(tv_ip, 5555)  # Always port 5555 for adb TCP/IP unless changed
+
+                # Find the device
+                devices = client.devices()
+                if not devices:
+                    raise Exception("No device found. Failed to connect to TV.")
+
+                device = devices[0]
+                print(f"Connected to device: {device.serial}")
+
+                # Launch VLC with the stream URL
+                command = (
+                    f"am start -a android.intent.action.VIEW "
+                    f"-d \"{stream_url}\" "
+                    f"-n org.videolan.vlc/.StartActivity"
+                )
+
+                print(f"Sending command: {command}")
+                output = device.shell(command)
+                print("Command output:", output)
+
+                # Optional: Disconnect cleanly
+                client.remote_disconnect(tv_ip, 5555)
+                print("Disconnected from TV.")
+
+            tv_ip = find_tv_via_chromecast(args.tv_name)
+            play_stream_on_tv_pure(tv_ip, file_stream)
 
         proc.wait()
     except KeyboardInterrupt as e:
@@ -546,7 +615,7 @@ def main(argv):
             proc.terminate()
         if update_thread:
             update_thread.stop()
-        if mediamtx_proc and mediamtx_proc is not None:
+        if mediamtx_proc is not None:
             mediamtx_proc.terminate()
         # if http_thread:
         #     http_thread.stop()
