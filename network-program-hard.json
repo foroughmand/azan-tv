@@ -4,14 +4,9 @@
         {
             "name": "imsak",
             "pre": ["media/dua-thomali", "media/pre-azan-sobh"],
-            "post": ["media/azan-moazzenzadeh", "media/namaz-sobh-mr-makarem", "media/azoma-albala"]
+            "post": ["media/azan-moazzenzadeh", "media/azoma-albala", "media/zehr-ya-zaljalal", "media/zehr-ya-zaljalal", "media/namaz-sobh-mr-makarem"]
         },
-        {
-            "name": "fajr",
-            "pre": ["media/dua-sahar", "media/dua-thomali", "media/pre-azan-sobh"],
-            "post": ["media/azan-moazzenzadeh", "media/azoma-albala"]
-        },
-        {
+            {
             "name": "dhuhr",
             "pre": ["media/quran-maryam", "media/ya-zaljalal"],
             "post": ["media/azan-moazzenzadeh", "media/azoma-albala", "media/doa-noor"]

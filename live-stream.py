@@ -218,12 +218,13 @@ def main(argv):
     parser.add_argument('--date', default=datetime.today().strftime('%Y-%m-%d'), help='date')
     parser.add_argument('--conf', default='config.json', help='config file')
     parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser", "tv": runs local MediaMTX server and opens VLC on the TV on the appropriate url.')
-    parser.add_argument('--azans', default=':'.join(['fajr', 'dhuhr', 'maghrib']), help='Colons seperated list of times to be shown in the stream. Options are "imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight".')
+    parser.add_argument('--azans', default=':'.join(['imsak', 'fajr', 'dhuhr', 'maghrib']), help='Colons seperated list of times to be shown in the stream. Options are "imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight".')
     parser.add_argument('--debug-time-diff', type=int, default=0, help='This will be added to the actual time (minutes)')
     parser.add_argument('--ip', type=str, default=get_local_ip(), help='IP used by local http server (for chromecast).')
     parser.add_argument('--port', type=int, default=8080, help='Port used by local http server (for chromecast).')
     parser.add_argument('--tv-name', default="Sony", help='Friendly name of TV for playing on it (for chromecast/TV).')
-
+    parser.add_argument('--rtsp-host', type=str, default=get_local_ip(), help='IP/host where MediaMTX RTSP server runs')
+    parser.add_argument('--rtsp-port', type=int, default=8554, help='RTSP port of MediaMTX (usually 8554)')
     args = parser.parse_args(args=argv)
 
     file_playlist = "playlist4.json"
@@ -522,7 +523,8 @@ def main(argv):
             import logging
             logging.basicConfig(level=logging.DEBUG)
 
-            file_stream = f"rtsp://{args.ip}:{args.port}/live"
+            # file_stream = f"rtsp://{args.ip}:{args.port}/live"
+            file_stream = f"rtsp://{args.rtsp_host}:{args.rtsp_port}/live"
 
             with open(file_ffplayout_config, "w") as f:
                 f.write(ffplayout_template.replace('{STREAM_URL}', '-f rtsp ' + file_stream))
@@ -581,10 +583,22 @@ def main(argv):
                 print(f"Connected to device: {device.serial}")
 
                 # Launch VLC with the stream URL
+                # command = (
+                #     f"am start -a android.intent.action.VIEW "
+                #     f"-d \"{stream_url}\" "
+                #     f"-n org.videolan.vlc/.StartActivity"
+                # )
+
+                device.shell("am force-stop org.videolan.vlc")
+                # Optional: small pause
+                time.sleep(0.3)
+
                 command = (
-                    f"am start -a android.intent.action.VIEW "
-                    f"-d \"{stream_url}\" "
-                    f"-n org.videolan.vlc/.StartActivity"
+                    "am start -W "
+                    "-n org.videolan.vlc/.gui.video.VideoPlayerActivity "
+                    "-a android.intent.action.VIEW "
+                    "-c android.intent.category.DEFAULT "
+                    f"-d '{stream_url}'"
                 )
 
                 print(f"Sending command: {command}")
@@ -615,7 +629,7 @@ def main(argv):
             proc.terminate()
         if update_thread:
             update_thread.stop()
-        if mediamtx_proc is not None:
+        if ('mediamtx_proc' in locals() or 'mediamtx_proc' in globals()) and mediamtx_proc is not None:
             mediamtx_proc.terminate()
         # if http_thread:
         #     http_thread.stop()
