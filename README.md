@@ -1,5 +1,5 @@
-# AZAN TV on Youtube
-With this repository you can create a streaming program with specified program for pre- and post-azan.
+# AZAN TV on Youtube or on Smart TVs
+With this repository you can create a streaming program with specified program for pre- and post-azan. This will use the program and location information to fetch the actual timing of the events and then with ffplay it creates an stream. Then, the stream could be sent to a live TV program, or could be played locally on Smart TV / mobile phones. 
 
 # Setup
 Download the codes
@@ -44,10 +44,11 @@ tar xzf ../mediamtx_v1.11.3_linux_amd64.tar.gz
 cd ..
 ```
 
-Run the application
+Run the application. Ports are used for TV. 
 ```
-python live-stream.py --out tv --port 8554
+python live-stream.py --out tv --rtsp-host 192.168.178.68 --rtsp-port 8554 --tv-name Sony
 ```
+Note that the previous command creates the stream, and also opens the VLC application on tv for playing the stream. For that, the application uses the tv-name option for finding the TV by the chromecast library.
 
 # Output options:
 
