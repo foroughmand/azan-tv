@@ -13,7 +13,7 @@
         },
         {
             "name": "maghrib",
-            "pre": ["media/quran-j{HIJRI_DAY}", "media/quran-taha-abkar", "media/asma-alhosna"],
+            "pre": ["media/quran-j{HIJRI_DAY}", "media/quran-raad-abkar", "media/asma-alhosna"],
             "post": ["media/azan-moazzenzadeh", "media/nature", "media/ya-ali-ya-azim", "media/allahomma-laka-somna", "media/dua-faraj", "media/doa-iftitah"]
         }
     ],

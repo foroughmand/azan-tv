@@ -44,6 +44,11 @@ tar xzf ../mediamtx_v1.11.3_linux_amd64.tar.gz
 cd ..
 ```
 
+Connect to tv with `adb` (`192.168.178.61:5555` is the ip of tv):
+```
+adb connect 192.168.178.61:5555
+```
+
 Run the application. Ports are used for TV. 
 ```
 python live-stream.py --out tv --rtsp-host 192.168.178.68 --rtsp-port 8554 --tv-name Sony

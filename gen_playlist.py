@@ -317,11 +317,11 @@ if __name__ == '__main__':
     pt = PrayTime('ISNA')
 
     # Location: New York City
-    date     = datetime.now()
+    date     = datetime.datetime.now()
     coords   = (40.7128, -74.0060)   # lat, lng
     timezone = -5                     # EST
 
-    times = pt.get_times(date, coords, timezone)
+    times = pt.getTimes(date, coords, timezone)
 
     print(f"Prayer times for {date.strftime('%Y-%m-%d')} — New York City")
     print("-" * 35)
@@ -402,15 +402,15 @@ def gen(azan_times, program, timer_file, replacements, args):
         r.extend(post_info)
 
         # print(f"fill: {filled} pre:{pre_info} post:{post_info}", file=sys.stderr)
-        print(f"fill: {filled}[{f_to_hms(filled)}] pre:{pre_durations.sum()}[{f_to_hms(pre_durations.sum())}] post:{post_durations.sum()} azan_time:{azan_times[name]}[{f_to_hms(azan_times[name])}] start:{start}[{f_to_hms(start)}]", file=sys.stderr)
+        # print(f"fill: {filled}[{f_to_hms(filled)}] pre:{pre_durations.sum()}[{f_to_hms(pre_durations.sum())}] post:{post_durations.sum()} azan_time:{azan_times[name]}[{f_to_hms(azan_times[name])}] start:{start}[{f_to_hms(start)}]", file=sys.stderr)
 
         filled = start + pre_durations.sum() + post_durations.sum()
 
     r.append((filled, 24*3600, timer_duration, timer_file))
     # r.append((0, 24*3600, timer_duration, timer_file))
 
-    for o, i, d, f in r:
-        print(f"r: [{f_to_hms(o)}-{f_to_hms(i)}] {f}", file=sys.stderr)
+    # for o, i, d, f in r:
+    #     print(f"r: [{f_to_hms(o)}-{f_to_hms(i)}] {f}", file=sys.stderr)
 
     diff = -args.debug_time_diff * 60
     rp = []
@@ -440,8 +440,8 @@ def gen(azan_times, program, timer_file, replacements, args):
     if diff < 0:
         rp.append((rp[-1][1], rp[-1][1]-diff, timer_duration, timer_file))
 
-    for o, i, d, f in rp:
-        print(f"rp: [{f_to_hms(o)}-{f_to_hms(i)}] {f}", file=sys.stderr)
+    # for o, i, d, f in rp:
+    #     print(f"rp: [{f_to_hms(o)}-{f_to_hms(i)}] {f}", file=sys.stderr)
 
     r = rp
 
@@ -467,6 +467,123 @@ def find_city(query):
             if query in city:
                 r.append(timezone(city))
     return r
+
+
+# Persian (Farsi) Gregorian month names as used on najaf.org
+_PERSIAN_GREGORIAN_MONTHS = {
+    'ژانویه': 1, 'ژانويه': 1, 'january': 1,
+    'فوریه': 2, 'فوريه': 2, 'february': 2,
+    'مارس': 3, 'march': 3,
+    'آوریل': 4, 'آوريل': 4, 'اپریل': 4, 'آپریل': 4, 'april': 4,
+    'مه': 5, 'می': 5, 'may': 5,
+    'ژوئن': 6, 'ژون': 6, 'june': 6,
+    'ژوئیه': 7, 'ژوئيه': 7, 'ژویه': 7, 'july': 7,
+    'اوت': 8, 'آگوست': 8, 'august': 8,
+    'سپتامبر': 9, 'september': 9,
+    'اکتبر': 10, 'اکتوبر': 10, 'october': 10,
+    'نوامبر': 11, 'نومبر': 11, 'november': 11,
+    'دسامبر': 12, 'december': 12,
+}
+
+# Hijri (Qamari) month names – Arabic, Persian, and English (e.g. praytimes.org)
+_HIJRI_MONTHS = {
+    'محرم': 1, 'محرّم': 1, 'muharram': 1, 'Muharram': 1,
+    'صفر': 2, 'safar': 2, 'Safar': 2,
+    'ربيع الاول': 3, 'ربيع الأول': 3, 'ربیع الاول': 3, 'ربیع‌الاول': 3, 'rabi al-awwal': 3, 'Rabi al-Awwal': 3,
+    'ربيع الآخر': 4, 'ربيع الثاني': 4, 'ربیع الثانی': 4, 'ربیع‌الثانی': 4, 'rabi al-thani': 4, 'Rabi al-Thani': 4,
+    'جمادى الاول': 5, 'جمادى الأولى': 5, 'جمادی الاول': 5, 'جمادی‌الاول': 5, 'jumada al-awwal': 5, 'Jumada al-Awwal': 5,
+    'جمادى الآخر': 6, 'جمادى الثانية': 6, 'جمادی الثانی': 6, 'جمادی‌الثانی': 6, 'jumada al-thani': 6, 'Jumada al-Thani': 6,
+    'رجب': 7, 'rajab': 7, 'Rajab': 7,
+    'شعبان': 8, 'sha\'ban': 8, 'shaaban': 8, 'Sha\'ban': 8, 'Shaaban': 8,
+    'رمضان': 9, 'ramadan': 9, 'Ramadan': 9,
+    'شوال': 10, 'shawwal': 10, 'Shawwal': 10,
+    'ذو القعدة': 11, 'ذو القعده': 11, 'ذیقعده': 11, 'ذو‌القعدة': 11, 'dhu al-qidah': 11, 'Dhu al-Qidah': 11,
+    'ذو الحجة': 12, 'ذو الحجه': 12, 'ذیحجه': 12, 'ذو‌الحجة': 12, 'dhu al-hijjah': 12, 'Dhu al-Hijjah': 12,
+}
+
+
+def _date_from_day_month_year(day: int, month_name: str, year: int, month_map: dict) -> str:
+    """Format as YYYY/MM/DD; month_name is looked up in month_map (name -> number)."""
+    month_name = month_name.strip()
+    month_num = month_map.get(month_name)
+    if month_num is None:
+        # try normalized key (collapse spaces, zero-width chars)
+        key = month_name.replace('\u200c', ' ').replace('  ', ' ').strip()
+        for k, v in month_map.items():
+            if k.replace('\u200c', ' ').replace('  ', ' ').strip() == key:
+                month_num = v
+                break
+        if month_num is None:
+            raise ValueError(f'Unknown month name: {month_name!r}')
+    return f'{year:04d}/{month_num:02d}/{day:02d}'
+
+
+def parse_najaf_date_html(html: str) -> dict:
+    """
+    Parse the prayer page HTML from najaf.org (or similar).
+    Expects a block like:
+      <span class='date'> 28 / فوريه / 2026<br> <strong class='my-blue'>10 / رمضان / 1447</strong> </span>
+    Returns {'gregorian': 'YYYY/MM/DD', 'qamari': 'YYYY/MM/DD'}.
+    """
+    # Extract content of span.date (including inner HTML)
+    date_span = re.search(r"<span\s+class=['\"]date['\"]\s*>([\s\S]*?)</span>", html)
+    if not date_span:
+        raise ValueError("Could not find <span class='date'> in HTML")
+    inner = date_span.group(1)
+
+    # Gregorian: text before <br> (e.g. "28 / فوريه / 2026")
+    gregorian_part = re.search(r"^([^<]+)", inner, re.DOTALL)
+    if not gregorian_part:
+        raise ValueError("Could not find Gregorian date part before <br>")
+    gregorian_text = gregorian_part.group(1).replace('<br>', '').replace('<br/>', '').strip()
+    g_match = re.match(r"(\d+)\s*/\s*([^/]+?)\s*/\s*(\d+)", gregorian_text)
+    if not g_match:
+        raise ValueError(f"Gregorian date format not recognized: {gregorian_text!r}")
+    g_day, g_month_name, g_year = int(g_match.group(1)), g_match.group(2).strip(), int(g_match.group(3))
+    gregorian = _date_from_day_month_year(g_day, g_month_name, g_year, _PERSIAN_GREGORIAN_MONTHS)
+
+    # Qamari (Hijri): content of <strong class='my-blue'> (e.g. "10 / رمضان / 1447")
+    qamari_strong = re.search(r"<strong\s+class=['\"]my-blue['\"]\s*>([^<]+)</strong>", inner)
+    if not qamari_strong:
+        raise ValueError("Could not find <strong class='my-blue'> in HTML")
+    qamari_text = qamari_strong.group(1).strip()
+    q_match = re.match(r"(\d+)\s*/\s*([^/]+?)\s*/\s*(\d+)", qamari_text)
+    if not q_match:
+        raise ValueError(f"Qamari date format not recognized: {qamari_text!r}")
+    q_day, q_month_name, q_year = int(q_match.group(1)), q_match.group(2).strip(), int(q_match.group(3))
+    qamari = _date_from_day_month_year(q_day, q_month_name, q_year, _HIJRI_MONTHS)
+
+    return {'gregorian': gregorian, 'qamari': qamari}
+
+
+def _hijri_year_from_gregorian_date(d: datetime.date) -> int:
+    """Approximate Hijri year from a Gregorian date (lunar year ~33/32 of solar)."""
+    return (d.year - 622) * 33 // 32
+
+
+def parse_praytimes_org_islamic_date(html: str, gregorian_date: datetime.date) -> str:
+    """
+    Parse https://praytimes.org page for Islamic date.
+    Expects: <span class="islamic-date text-muted">11 Ramadan </span>
+    Returns qamari as YYYY/MM/DD; year is computed from gregorian_date (approximate Hijri year).
+    """
+    m = re.search(
+        r'<span\s+class=["\']islamic-date\s+text-muted["\']\s*>([^<]+)</span>',
+        html,
+        re.IGNORECASE,
+    )
+    if not m:
+        raise ValueError("Could not find <span class=\"islamic-date text-muted\"> in HTML")
+    text = m.group(1).strip()
+    # e.g. "11 Ramadan" or "11 Ramadan "
+    parts = text.split(None, 1)
+    if len(parts) != 2:
+        raise ValueError(f"Islamic date format not recognized: {text!r}")
+    day = int(parts[0])
+    month_name = parts[1].strip()
+    year = _hijri_year_from_gregorian_date(gregorian_date)
+    return _date_from_day_month_year(day, month_name, year, _HIJRI_MONTHS)
+
 
 # conf = pd.read_json(args.conf, lines=True)
 
@@ -525,29 +642,58 @@ def main(argv):
         azan_prayertimes = {o:t*3600 for o,t in owghat.items()}
         print('PrayerTimes', azan_prayertimes, {o:f_to_hms(t*3600) for o, t in owghat.items()}, file=sys.stderr)
 
+        # fetch Qamari (Hijri) date: from praytimes.org or najaf.org when not using aviny API, else from aviny API
+            
         url = f'https://prayer.aviny.com/api/prayertimes/{args.city_aviny}'
-        r = requests.get(url).json()
-        # print('r', r)
-        replacements['{HIJRI_DAY}'] = r['TodayQamari'].split('/')[2]
-        replacements['{HIJRI_MONTH}'] = r['TodayQamari'].split('/')[1]
-        replacements['{HIJRI_YEAR}'] = r['TodayQamari'].split('/')[0]
+        try:
+            r = requests.get(url, timeout=15)
+            r.raise_for_status()
+            r = r.json()
+            todayQamari = r['TodayQamari']
+            azan_r = {'imsak': r['Imsaak'], 'fajr': r['Imsaak'], 'sunrise': r['Sunrise'],
+                    'dhuhr': r['Noon'], 'asr': r['Noon'], 'sunset': r['Sunset'],
+                    'maghrib': r['Maghreb'], 'isha': r['Maghreb'], 'midnight': r['Midnight']}
+            azan_aviny = {o:(t[0]*3600+t[1]*60+t[2]) for o, t in {o:[int(i) for i in t.split(':')] for o, t in azan_r.items()}.items()}
+            print('Aviny', azan_aviny, azan_r, file=sys.stderr)
+        except (requests.exceptions.Timeout, requests.RequestException, KeyError, ValueError) as e:
+            azan_aviny = {o:0 for o in ['imsak', 'fajr', 'sunrise', 'dhuhr', 'asr', 'sunset', 'maghrib', 'isha', 'midnight']}
+            print(f'Failed to fetch aviny API: {e}', file=sys.stderr)
+            try:
+                url = f'https://www.najaf.org/persian/prayer.php?city=united-kingdom_london'
+                r = requests.get(url, timeout=10).text
+                parsed = parse_najaf_date_html(r)
+                todayQamari = parsed['qamari']
+                print('Qamari from Najaf.org', todayQamari, parsed, file=sys.stderr)
+            except (ValueError, KeyError, requests.RequestException) as e:
+                print(f'Failed to parse najaf date HTML: {e}', file=sys.stderr)
+                try:
+                    r = requests.get('https://praytimes.org/', timeout=10)
+                    r.raise_for_status()
+                    todayQamari = parse_praytimes_org_islamic_date(r.text, date)
+                    print('Qamari from Praytimes.org', todayQamari, r.text, file=sys.stderr)
+                except (ValueError, KeyError, requests.RequestException) as e:
+                    print(f'Failed to parse praytimes.org Islamic date: {e}', file=sys.stderr)
+                    raise Exception('Failed to fetch Qamari date')
 
-        azan_r = {'imsak': r['Imsaak'], 'fajr': r['Imsaak'], 'sunrise': r['Sunrise'], 
-                'dhuhr': r['Noon'], 'asr': r['Noon'], 'sunset': r['Sunset'], 
-                'maghrib': r['Maghreb'], 'isha': r['Maghreb'], 'midnight': r['Midnight']}
-        # print(azan_r, file=sys.stderr)
-        # print({o:[int(i) for i in t.split(':')] for o, t in azan_r.items()}, file=sys.stderr)
-        azan_aviny = {o:(t[0]*3600+t[1]*60+t[2]) for o, t in {o:[int(i) for i in t.split(':')] for o, t in azan_r.items()}.items()}
-        print('Aviny', azan_aviny, azan_r, file=sys.stderr)
 
-        date_yb = datetime.date(date.year, 1, 1)
-        url = f'https://syber.ir/api/oghat/oneday/{location.latitude}/{location.longitude}/{(date - date_yb).days}/{date.year}/0/'
-        r = requests.get(url).json()
-        azan_r = {'imsak': r['imsakString'], 'fajr': r['modifiedFajrString'], 'sunrise': r['riseString'], 
-                'dhuhr': r['noonString'], 'asr': r['asrString'], 'sunset': r['setString'], 
-                'maghrib': r['maghribString'], 'isha': r['modifiedIshaString'], 'midnight': r['midnightString']}
-        azan_izhamburg = {o:(t[0]*3600+t[1]*60+0) for o, t in {o:[int(i) for i in t.replace(' ', '').split(':')] for o, t in azan_r.items()}.items()}
-        print(f'izhamburg {azan_izhamburg} {azan_r}', file=sys.stderr)
+        replacements['{HIJRI_DAY}'] = todayQamari.split('/')[2]
+        replacements['{HIJRI_MONTH}'] = todayQamari.split('/')[1]
+        replacements['{HIJRI_YEAR}'] = todayQamari.split('/')[0]
+
+
+        if 'izhamburg' in args.source.split(':'):
+            date_yb = datetime.date(date.year, 1, 1)
+            url = f'https://syber.ir/api/oghat/oneday/{location.latitude}/{location.longitude}/{(date - date_yb).days}/{date.year}/0/'
+            r = requests.get(url).json()
+            azan_r = {'imsak': r['imsakString'], 'fajr': r['modifiedFajrString'], 'sunrise': r['riseString'], 
+                    'dhuhr': r['noonString'], 'asr': r['asrString'], 'sunset': r['setString'], 
+                    'maghrib': r['maghribString'], 'isha': r['modifiedIshaString'], 'midnight': r['midnightString']}
+            azan_izhamburg = {o:(t[0]*3600+t[1]*60+0) for o, t in {o:[int(i) for i in t.replace(' ', '').split(':')] for o, t in azan_r.items()}.items()}
+            print(f'izhamburg {azan_izhamburg} {azan_r}', file=sys.stderr)
+        else:
+            azan_izhamburg = {'imsak': '12:00:00', 'fajr': '12:00:00', 'sunrise': '12:00:00', 
+                    'dhuhr': '12:00:00', 'asr': '12:00:00', 'sunset': '12:00:00', 
+                    'maghrib': '12:00:00', 'isha': '12:00:00', 'midnight': '12:00:00'}
 
         azan_function = {'imsak': min, 'fajr': max, 'sunrise': min, 
                 'dhuhr': max, 'asr': max, 'sunset': min, 
