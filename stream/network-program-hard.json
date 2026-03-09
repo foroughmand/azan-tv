@@ -4,7 +4,7 @@
         {
             "name": "imsak",
             "pre": ["media/dua-thomali", "media/pre-azan-sobh"],
-            "post": ["media/azan-moazzenzadeh", "media/azoma-albala", "media/zehr-ya-zaljalal", "media/zehr-ya-zaljalal", "media/namaz-sobh-mr-makarem"]
+            "post": ["media/azan-moazzenzadeh", "media/azoma-albala", "media/zehr-ya-zaljalal", "media/zehr-ya-zaljalal", "media/namaz-sobh-mr-makarem", "media/dua-faraj"]
         },
             {
             "name": "dhuhr",
@@ -13,7 +13,7 @@
         },
         {
             "name": "maghrib",
-            "pre": ["media/quran-j{HIJRI_DAY}", "media/quran-raad-abkar", "media/asma-alhosna"],
+            "pre": ["media/quran-j{HIJRI_DAY}", "media/p-13-tanzil.fixed", "media/asma-alhosna"],
             "post": ["media/azan-moazzenzadeh", "media/nature", "media/ya-ali-ya-azim", "media/allahomma-laka-somna", "media/dua-faraj", "media/doa-iftitah"]
         }
     ],

@@ -1,0 +1,10 @@
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+export AZAN_TV_ROOT="$HERE/usr/share/azan-tv"
+# User data dir for config/media/bin/logs/tmp
+if [ -n "$XDG_DATA_HOME" ]; then
+  export AZAN_TV_WORKDIR="$XDG_DATA_HOME/azan-tv"
+else
+  export AZAN_TV_WORKDIR="$HOME/.local/share/azan-tv"
+fi
+exec "$HERE/usr/bin/azan-tv" "$@"

@@ -6,8 +6,8 @@
 	"description": "Pre and post prayer time Videos for Braunschweig on date {DATE}",
 	"thumbnails": "https://upload.wikimedia.org/wikipedia/de/thumb/5/53/Eidenbenzl%C3%B6we.svg/800px-Eidenbenzl%C3%B6we.svg.png",
 	"privacy": "unlisted",
-	"ffplayout_template": "ffplayout-template.yml",
-	"program_template": "network-program-hard.json",
+	"ffplayout_template": "stream/ffplayout-template.yml",
+	"program_template": "stream/network-program-hard.json",
 	"translation": {
 		"imsak": "سحر", "fajr": "صبح", "sunrise": "طلوع", 
                 "dhuhr": "ظهر", "asr": "عصر", "sunset": "غروب", 

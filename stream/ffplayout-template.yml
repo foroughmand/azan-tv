@@ -23,7 +23,7 @@ logging:
   backup_count: 7
   local_time: true
   timestamp: true
-  path: /var/log/ffplayout/
+  path: .
   level: DEBUG
   ffmpeg_level: error
   ingest_level: warning
@@ -40,10 +40,11 @@ processing:
   aspect: 1.778
   fps: 25.0
   add_logo: true
-  logo: /usr/share/ffplayout/logo.png
+  logo: ''
   logo_scale: ''
   logo_opacity: 0.7
   logo_filter: overlay=W-w-12:12
+  logo_position: overlay=W-w-12:12
   audio_tracks: 1
   audio_channels: 2
   volume: 1.0
@@ -56,7 +57,7 @@ ingest:
 playlist:
   help_text: |
     'path' can be a path to a single file, or a directory. For directory put only the root folder, for example '/playlists', subdirectories are read by the script. Subdirectories needs this structure '/playlists/2018/01'. 'day_start' means at which time the playlist should start, leave day_start blank when playlist should always start at the begin. 'length' represent the target length from playlist, when is blank real length will not consider. 'infinit: true' works with single playlist file and loops it infinitely.
-  path: /var/lib/ffplayout/playlists
+  path: .
   day_start: 00:00:00
   length: 24:00:00
   infinit: false
@@ -72,11 +73,12 @@ storage:
 text:
   help_text: Overlay text in combination with libzmq for remote text manipulation. On windows fontfile path need to be like this 'C\:/WINDOWS/fonts/DejaVuSans.ttf'. 'text_from_filename' activate the extraction from text of a filename. With 'style' you can define the drawtext parameters like position, color, etc. Post Text over API will override this. With 'regex' you can format file names, to get a title from it.
   add_text: true
-  fontfile: HM_XNiloofar.ttf
+  fontfile: app/bundles/HM_XNiloofar.ttf
   text_from_filename: false
   style: x=(w-tw)/2:y=(h-line_h)*0.9:fontsize=24:fontcolor=#ffffff:box=1:boxcolor=#000000:boxborderw=4
   regex: ==file==time-info.txt
 task:
+  help_text: Run custom tasks at playlist start/end or at given time.
   enable: false
   path: ''
 out:

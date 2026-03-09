@@ -473,7 +473,7 @@ def find_city(query):
 _PERSIAN_GREGORIAN_MONTHS = {
     'ژانویه': 1, 'ژانويه': 1, 'january': 1,
     'فوریه': 2, 'فوريه': 2, 'february': 2,
-    'مارس': 3, 'march': 3,
+    'مارس': 3, 'march': 3, 'مارچ': 3,
     'آوریل': 4, 'آوريل': 4, 'اپریل': 4, 'آپریل': 4, 'april': 4,
     'مه': 5, 'می': 5, 'may': 5,
     'ژوئن': 6, 'ژون': 6, 'june': 6,
@@ -530,6 +530,7 @@ def parse_najaf_date_html(html: str) -> dict:
     if not date_span:
         raise ValueError("Could not find <span class='date'> in HTML")
     inner = date_span.group(1)
+    # print(f"inner={inner}", file=sys.stderr)
 
     # Gregorian: text before <br> (e.g. "28 / فوريه / 2026")
     gregorian_part = re.search(r"^([^<]+)", inner, re.DOTALL)
@@ -551,6 +552,7 @@ def parse_najaf_date_html(html: str) -> dict:
     if not q_match:
         raise ValueError(f"Qamari date format not recognized: {qamari_text!r}")
     q_day, q_month_name, q_year = int(q_match.group(1)), q_match.group(2).strip(), int(q_match.group(3))
+    print(f"q_day={q_day} q_month_name={q_month_name} q_year={q_year}", file=sys.stderr)
     qamari = _date_from_day_month_year(q_day, q_month_name, q_year, _HIJRI_MONTHS)
 
     return {'gregorian': gregorian, 'qamari': qamari}
@@ -646,7 +648,7 @@ def main(argv):
             
         url = f'https://prayer.aviny.com/api/prayertimes/{args.city_aviny}'
         try:
-            r = requests.get(url, timeout=15)
+            r = requests.get(url, timeout=2)
             r.raise_for_status()
             r = r.json()
             todayQamari = r['TodayQamari']
@@ -657,7 +659,8 @@ def main(argv):
             print('Aviny', azan_aviny, azan_r, file=sys.stderr)
         except (requests.exceptions.Timeout, requests.RequestException, KeyError, ValueError) as e:
             azan_aviny = {o:0 for o in ['imsak', 'fajr', 'sunrise', 'dhuhr', 'asr', 'sunset', 'maghrib', 'isha', 'midnight']}
-            print(f'Failed to fetch aviny API: {e}', file=sys.stderr)
+            # todayQamari = '1444/10/11'
+            print(f'Failed to fetch aviny API: ', file=sys.stderr)
             try:
                 url = f'https://www.najaf.org/persian/prayer.php?city=united-kingdom_london'
                 r = requests.get(url, timeout=10).text
@@ -665,7 +668,7 @@ def main(argv):
                 todayQamari = parsed['qamari']
                 print('Qamari from Najaf.org', todayQamari, parsed, file=sys.stderr)
             except (ValueError, KeyError, requests.RequestException) as e:
-                print(f'Failed to parse najaf date HTML: {e}', file=sys.stderr)
+                print(f'Failed to parse najaf date HTML: ', file=sys.stderr)
                 try:
                     r = requests.get('https://praytimes.org/', timeout=10)
                     r.raise_for_status()

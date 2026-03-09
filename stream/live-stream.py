@@ -1,29 +1,28 @@
-import sys, subprocess, os
+import sys, subprocess, os, shutil
 import time, json
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
 from datetime import datetime, timedelta
-from oauth2client.file import Storage
-from apiclient.errors import HttpError
-from oauth2client.client import flow_from_clientsecrets
-import httplib2
-from oauth2client.tools import argparser, run_flow
 import argparse
 import threading
-from persiantools import digits
 import webbrowser
 import time
 import signal
 import argparse
 from threading import Event
-import pychromecast
-from pychromecast.controllers.youtube import YouTubeController
 import threading
 import http.server
 import socketserver
 
-CLIENT_SECRETS_FILE = 'client_secret.json'
+try:
+    from persiantools import digits
+except Exception:
+    class _DigitsFallback:
+        @staticmethod
+        def en_to_fa(s):
+            return s
+    digits = _DigitsFallback()
+
+CLIENT_SECRETS_FILE = 'keys/client_secret.json'
+OAUTH2_FILE = "keys/user-oauth2.json"
 
 YOUTUBE_SCOPE = ["https://www.googleapis.com/auth/youtube", "https://www.googleapis.com/auth/youtubepartner"]
 API_SERVICE_NAME = 'youtube'
@@ -33,17 +32,24 @@ CONTENT_ID_API_VERSION = "v1"
 INVALID_CREDENTIALS = "Invalid Credentials"
 
 
-def get_authenticated_service():
+def get_authenticated_service(flags=None):
+    # Import YouTube auth libraries lazily so tv/desktop modes do not require them.
+    from oauth2client.file import Storage
+    from oauth2client.client import flow_from_clientsecrets
+    from oauth2client.tools import run_flow
+    from googleapiclient.discovery import build
+    import httplib2
+
     flow = flow_from_clientsecrets(CLIENT_SECRETS_FILE,
         scope=" ".join(YOUTUBE_SCOPE),
         message="MISSING_CLIENT_SECRETS_MESSAGE")
 
-    storage = Storage("user-oauth2.json")
+    storage = Storage(OAUTH2_FILE)
     credentials = storage.get()
 
     if credentials is None or credentials.invalid:
-        # credentials = flow.run_local_server()
-        credentials = run_flow(flow, storage, None)
+        # Pass flags so run_flow does not re-parse sys.argv (which has --out/--conf and would error).
+        credentials = run_flow(flow, storage, flags)
 
 #   return build(API_SERVICE_NAME, API_VERSION,
 #     http=credentials.authorize(httplib2.Http()))
@@ -59,6 +65,8 @@ def get_authenticated_service():
     return (youtube, youtube_partner)
 
 def get_content_owner_id(youtube_partner):
+    from apiclient.errors import HttpError
+
     try:
         content_owners_list_response = youtube_partner.contentOwners().list(
             fetchMine=True
@@ -213,11 +221,17 @@ def get_local_ip():
 
 # Main function
 def main(argv):
+    global CLIENT_SECRETS_FILE, OAUTH2_FILE
 
-    parser = argparse.ArgumentParser()
+    # Include oauth2client's flags so run_flow() does not parse sys.argv and fail on our --out/--conf.
+    try:
+        from oauth2client import tools as oauth2_tools
+        parser = argparse.ArgumentParser(parents=[oauth2_tools.argparser])
+    except Exception:
+        parser = argparse.ArgumentParser()
     parser.add_argument('--date', default=datetime.today().strftime('%Y-%m-%d'), help='date')
-    parser.add_argument('--conf', default='config.json', help='config file')
-    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser", "tv": runs local MediaMTX server and opens VLC on the TV on the appropriate url.')
+    parser.add_argument('--conf', default='stream/config.json', help='config file')
+    parser.add_argument('--out', default='stream', help='Output of ffplayout. Options = "stream", "desktop", "chromecast", "browser", "tv", "auth". "auth" only performs YouTube OAuth login and exits.')
     parser.add_argument('--azans', default=':'.join(['imsak', 'fajr', 'dhuhr', 'maghrib']), help='Colons seperated list of times to be shown in the stream. Options are "imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight".')
     parser.add_argument('--debug-time-diff', type=int, default=0, help='This will be added to the actual time (minutes)')
     parser.add_argument('--ip', type=str, default=get_local_ip(), help='IP used by local http server (for chromecast).')
@@ -230,6 +244,7 @@ def main(argv):
     file_playlist = "playlist4.json"
     file_ffplayout_config = "ffplayout2.yml"
     file_times_info = "azan-times.json"
+    work_dir = os.path.abspath(os.environ.get("AZAN_TV_WORKDIR", os.getcwd()))
     file_time_info = "time-info.txt"
     file_translations = "time-translations.txt"
     file_stream = "tmp/stream.m3u8"
@@ -238,6 +253,49 @@ def main(argv):
         conf = json.load(json_file)
         conf["title"] = conf["title"].replace('{DATE}', args.date)
         conf["description"] = conf["description"].replace('{DATE}', args.date)
+        CLIENT_SECRETS_FILE = conf.get("client_secrets_file", CLIENT_SECRETS_FILE)
+        OAUTH2_FILE = conf.get("oauth2_file", OAUTH2_FILE)
+
+    if args.out == "auth":
+        get_authenticated_service(args)
+        print("YouTube authentication successful.")
+        return
+
+    # Prefer env; then platform folder (ffplayout/mac on Mac, ffplayout/linux on Linux). On Mac never use target/debug (wrong arch → Exec format error).
+    ffplayout_bin = os.environ.get("AZAN_TV_FFPLAYOUT")
+    if not ffplayout_bin:
+        import platform
+        plat = "mac" if platform.system() == "Darwin" else "linux"
+        # Check platform-specific folder first (required on Mac; preferred on Linux)
+        candidates = [f"ffplayout/{plat}/ffplayout"]
+        if plat == "linux":
+            candidates.append("ffplayout/target/debug/ffplayout")
+        for candidate in candidates:
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                ffplayout_bin = candidate
+                break
+        else:
+            ffplayout_bin = None
+    if not ffplayout_bin or not (os.path.isfile(ffplayout_bin) and os.access(ffplayout_bin, os.X_OK)):
+        if sys.platform == "darwin":
+            sys.exit(
+                "ffplayout not found for macOS. Put a Mac-built binary at ffplayout/mac/ffplayout\n"
+                "(Build with Rust on a Mac: cargo build in the ffplayout repo, then copy target/debug/ffplayout to ffplayout/mac/.)"
+            )
+        sys.exit("ffplayout not found. Put a binary at ffplayout/linux/ffplayout or ffplayout/target/debug/ffplayout")
+
+    def ffplayout_cmd(output_mode, playlist_path=file_playlist, config_path=file_ffplayout_config):
+        """Build ffplayout argv: -p playlist -o MODE --log <work_dir> -c config. Log file will be <work_dir>/ffplayout.log."""
+        abs_bin = os.path.abspath(ffplayout_bin) if not os.path.isabs(ffplayout_bin) else ffplayout_bin
+        abs_playlist = os.path.abspath(playlist_path)
+        abs_config = os.path.abspath(config_path)
+        return [
+            abs_bin,
+            "-p", abs_playlist,
+            "-o", output_mode,
+            "--log", work_dir,
+            "-c", abs_config,
+        ]
 
     proc = None
     update_thread = None
@@ -347,7 +405,7 @@ def main(argv):
 
     http_thread = threading.Thread(target=start_http_server, args=(args.ip, args.port), daemon=True)
 
-    youtube, youtube_partner = get_authenticated_service()
+    youtube, youtube_partner = None, None
 
     # content_owner_id = get_content_owner_id(youtube_partner)
     try:
@@ -356,7 +414,59 @@ def main(argv):
         # video_id = get_video_id()
 
 
+        # Copy HM_XNiloofar.ttf from bundles/ into work dir so overlay can use it on Linux and Mac
+        font_name = "HM_XNiloofar.ttf"
+        font_dest = os.path.join(work_dir, font_name)
+        if not os.path.isfile(font_dest):
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            for src in [
+                os.path.join(work_dir, "bundles", font_name),
+                os.path.join(script_dir, "bundles", font_name),
+                os.path.join(os.getcwd(), "bundles", font_name),
+            ]:
+                if os.path.isfile(src):
+                    try:
+                        shutil.copy2(src, font_dest)
+                        break
+                    except Exception:
+                        pass
         ffplayout_template = open(conf["ffplayout_template"], 'r').read()
+        # Use only paths inside our work dir (no /var, /usr etc.) so we don't need write access to system dirs
+        ffplayout_template = ffplayout_template.replace("/var/lib/ffplayout/playlists", work_dir)
+        ffplayout_template = ffplayout_template.replace("/var/log/ffplayout/", work_dir + os.sep)
+        ffplayout_template = ffplayout_template.replace("/usr/share/ffplayout/logo.png", "")
+        ffplayout_template = ffplayout_template.replace("add_logo: true", "add_logo: false")
+        # Use absolute paths under work_dir for font and time-info so overlay works when ffplayout cwd is not work_dir (e.g. Mac bundle)
+        if os.path.isfile(font_dest):
+            ffplayout_template = ffplayout_template.replace("fontfile: HM_XNiloofar.ttf", "fontfile: " + os.path.abspath(font_dest))
+        else:
+            ffplayout_template = ffplayout_template.replace("fontfile: HM_XNiloofar.ttf", "fontfile: Helvetica")
+        time_info_path = os.path.abspath(os.path.join(work_dir, file_time_info))
+        ffplayout_template = ffplayout_template.replace("regex: ==file==time-info.txt", "regex: ==file==" + time_info_path)
+        # Debug: overlay paths and log location (check ffplayout.log if overlay is missing)
+        print("Overlay: fontfile=" + (os.path.abspath(font_dest) if os.path.isfile(font_dest) else "Helvetica") + " | textfile=" + time_info_path, flush=True)
+        print("ffplayout log: " + os.path.join(work_dir, "ffplayout.log"), flush=True)
+        # Ensure logo_position exists (required by ffplayout mac/linux binary; old bundled template may lack it)
+        if "logo_position:" not in ffplayout_template and "logo_filter:" in ffplayout_template:
+            ffplayout_template = ffplayout_template.replace(
+                "logo_filter: overlay=W-w-12:12",
+                "logo_filter: overlay=W-w-12:12\n  logo_position: overlay=W-w-12:12",
+                1,
+            )
+        elif "logo_position:" not in ffplayout_template and "processing:" in ffplayout_template:
+            # Insert after first occurrence of "logo_opacity:" in processing section
+            ffplayout_template = ffplayout_template.replace(
+                "logo_opacity: 0.7",
+                "logo_opacity: 0.7\n  logo_position: overlay=W-w-12:12",
+                1,
+            )
+        # Ensure task.help_text exists (required by ffplayout binary; old bundled template may lack it)
+        if "task:\n  enable:" in ffplayout_template and "task:\n  help_text:" not in ffplayout_template:
+            ffplayout_template = ffplayout_template.replace(
+                "task:\n  enable:",
+                "task:\n  help_text: Run custom tasks at playlist start/end or at given time.\n  enable:",
+                1,
+            )
         with open(file_ffplayout_config, "w") as f:
             # ffplayout_config = ffplayout_template
             # if args.out in ["desktop", "stream", "browser"]:
@@ -367,25 +477,44 @@ def main(argv):
             #     raise RuntimeError("Invalid args.out=" + args.out)
             f.write(ffplayout_template)
 
+        # v0.25+ ffplayout must run from its extracted bundle dir (has sibling files it needs)
+        ffplayout_cwd = work_dir
+        bundle_dir_file = os.path.join(work_dir, "ffplayout_bundle_dir.txt")
+        if os.path.isfile(bundle_dir_file):
+            try:
+                with open(bundle_dir_file, encoding="utf-8") as f:
+                    ffplayout_cwd = f.read().strip()
+                if os.path.isdir(ffplayout_cwd):
+                    pass  # use it
+                else:
+                    ffplayout_cwd = work_dir
+            except Exception:
+                ffplayout_cwd = work_dir
+
         if args.out == "desktop":
+            cmd = ffplayout_cmd("desktop")
             print("running ffplayout")
-            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "desktop", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+            print(" ".join(cmd), flush=True)
+            proc = subprocess.Popen(cmd, shell=False, cwd=ffplayout_cwd)
             print("We will wait for ffplayout", proc)
         # proc.communicate()
         elif args.out in ["stream", "browser"]:
+            youtube, youtube_partner = get_authenticated_service(args)
             
             # Create a live stream
             stream_id, stream_url = create_live_stream(youtube, conf["title"], conf["description"])
-            print(f"stream_id: {stream_id}, stream_url: {stream_url}")
+            print(f"stream_id: {stream_id}, stream_url: {stream_url}", flush=True)
 
             with open(file_ffplayout_config, "w") as f:
                 f.write(ffplayout_template.replace('{STREAM_URL}', ('-f flv ' + stream_url) if stream_url is not None else ''))
 
             # Create a live broadcast
             broadcast_id = create_live_broadcast(youtube, None, stream_id, conf["title"], conf["description"], conf["thumbnails"], conf["privacy"])
-            print(f"broadcast_id: {broadcast_id} url=https://youtu.be/{broadcast_id}")
+            print(f"broadcast_id: {broadcast_id} url=https://youtu.be/{broadcast_id}", flush=True)
 
-            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+            cmd = ffplayout_cmd("stream")
+            print(" ".join(cmd), flush=True)
+            proc = subprocess.Popen(cmd, shell=False, cwd=ffplayout_cwd)
             # wait_for_stream_ready(youtube, stream_id)
 
             wait_for(lambda: get_stream_status(youtube, stream_id) == "active")
@@ -436,12 +565,15 @@ def main(argv):
             else:
                 print(f"Now open this link https://youtu.be/{broadcast_id}")
         elif args.out == "chromecast":
+            import pychromecast
             import logging
             logging.basicConfig(level=logging.DEBUG)
 
             with open(file_ffplayout_config, "w") as f:
                 f.write(ffplayout_template.replace('{STREAM_URL}', '-f hls ' + file_stream))
-            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+            cmd = ffplayout_cmd("stream")
+            print(" ".join(cmd), flush=True)
+            proc = subprocess.Popen(cmd, shell=False, cwd=ffplayout_cwd)
 
             http_thread.start()
 
@@ -517,6 +649,7 @@ def main(argv):
                 print("✅ Streaming should be playing on your TV!")
             # cast_stream(args.tv_name, f"http://{args.ip}:{args.port}/" + file_stream)
         elif args.out == "tv":
+            import pychromecast
             mediamtx_proc = subprocess.Popen(["bin/mediamtx", "bin/mediamtx.yml"])
             time.sleep(2)
 
@@ -528,7 +661,9 @@ def main(argv):
 
             with open(file_ffplayout_config, "w") as f:
                 f.write(ffplayout_template.replace('{STREAM_URL}', '-f rtsp ' + file_stream))
-            proc = subprocess.Popen(["ffplayout/target/debug/ffplayout", "-p", file_playlist, "-o", "stream", "--log", "ffplayout.log", "-c", file_ffplayout_config], shell=False)
+            cmd = ffplayout_cmd("stream")
+            print(" ".join(cmd), flush=True)
+            proc = subprocess.Popen(cmd, shell=False, cwd=ffplayout_cwd)
 
             print(f'Live url: {file_stream}. You can open this link.')
 

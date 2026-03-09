@@ -1,0 +1,14 @@
+# Python runtime dependencies used by live-stream.py and gen_playlist.py
+tzfpy
+geopy
+requests
+pandas
+numpy
+ffmpeg-python
+google-auth-oauthlib
+google-api-python-client
+oauth2client
+pychromecast
+persiantools
+pure-python-adb
+pytz
