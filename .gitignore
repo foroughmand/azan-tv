@@ -5,6 +5,16 @@ client_secret.json
 ffplayout2.yml
 media/**
 playlist4.json
+data/client_secret.json
+data/user-oauth2.json
+keys/client_secret.json
+keys/user-oauth2.json
+keys/server.crt
+keys/server.key
+stream/ffplayout2.yml
+stream/playlist4.json
+stream/azan-times.json
+stream/time-info.txt
 time-info.txt
 user-oauth2.json
 devel
@@ -13,3 +23,11 @@ devel
 *-debug/
 bin/
 ffplayout/
+
+# App build artifacts (when building from app/)
+app/dist/
+app/build/
+app/AppDir/
+app/.build-runtime-python/
+app/.build-runtime-python-mac/
+app/*.AppImage
