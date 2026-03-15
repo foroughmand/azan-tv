@@ -357,27 +357,29 @@ def f_to_hms(x):
     s = x % 60
     return f"{h:02d}:{m:02d}:{s:06.3f}"
 
-def apply_replacements(lst: list[str], replacements: dict[str, str]):
+def apply_replacements(lst: list[str], replacements: dict[str, str], base_dir: str | None = None):
     r = []
+    root_dir = os.path.abspath(base_dir) if base_dir else os.getcwd()
     for l in lst:
         rl = l
         for a, b in replacements.items():
             if rl.find(a):
                 rl = rl.replace(a, b)
 
+        candidate = rl if os.path.isabs(rl) else os.path.join(root_dir, rl)
         for ext in ['', '.mkv', '.mp4', '.m4v', '.webm']:
-            if os.path.isfile(rl + ext):
-                rl = rl + ext
+            if os.path.isfile(candidate + ext):
+                rl = candidate + ext
                 break
         if not os.path.isfile(rl):
-            raise RuntimeError(f"File '{rl}' with none of the extensions exists.")
+            raise RuntimeError(f"File '{l}'->{rl} with none of the extensions exists under base_dir={root_dir}, {replacements}")
         r.append(rl)
     print(f"File names: {r}", file=sys.stderr)
     return r
 
 def gen(azan_times, program, timer_file, replacements, args):
     print(f"gen {program} timer_file:{timer_file}", file=sys.stderr)
-    timer_file = apply_replacements([timer_file], replacements)[0]
+    timer_file = apply_replacements([timer_file], replacements, args.work_dir)[0]
     timer_duration = get_video_duration(timer_file)
     # r = [(start, end, duration, file)]
     r = []
@@ -386,8 +388,8 @@ def gen(azan_times, program, timer_file, replacements, args):
     for p in program:
         print(f"Program {p}", file=sys.stderr)
         name = p['name']
-        p['pre'] = apply_replacements(p['pre'], replacements)
-        p['post'] = apply_replacements(p['post'], replacements)
+        p['pre'] = apply_replacements(p['pre'], replacements, args.work_dir)
+        p['post'] = apply_replacements(p['post'], replacements, args.work_dir)
         pre_durations = np.array([get_video_duration(f) for f in p['pre']])
         post_durations = np.array([get_video_duration(f) for f in p['post']])
     
@@ -473,7 +475,7 @@ def find_city(query):
 _PERSIAN_GREGORIAN_MONTHS = {
     'ژانویه': 1, 'ژانويه': 1, 'january': 1,
     'فوریه': 2, 'فوريه': 2, 'february': 2,
-    'مارس': 3, 'march': 3,
+    'مارس': 3, 'march': 3, 'مارچ': 3,
     'آوریل': 4, 'آوريل': 4, 'اپریل': 4, 'آپریل': 4, 'april': 4,
     'مه': 5, 'می': 5, 'may': 5,
     'ژوئن': 6, 'ژون': 6, 'june': 6,
@@ -530,6 +532,7 @@ def parse_najaf_date_html(html: str) -> dict:
     if not date_span:
         raise ValueError("Could not find <span class='date'> in HTML")
     inner = date_span.group(1)
+    # print(f"inner={inner}", file=sys.stderr)
 
     # Gregorian: text before <br> (e.g. "28 / فوريه / 2026")
     gregorian_part = re.search(r"^([^<]+)", inner, re.DOTALL)
@@ -551,6 +554,7 @@ def parse_najaf_date_html(html: str) -> dict:
     if not q_match:
         raise ValueError(f"Qamari date format not recognized: {qamari_text!r}")
     q_day, q_month_name, q_year = int(q_match.group(1)), q_match.group(2).strip(), int(q_match.group(3))
+    print(f"q_day={q_day} q_month_name={q_month_name} q_year={q_year}", file=sys.stderr)
     qamari = _date_from_day_month_year(q_day, q_month_name, q_year, _HIJRI_MONTHS)
 
     return {'gregorian': gregorian, 'qamari': qamari}
@@ -600,6 +604,7 @@ def main(argv):
     parser.add_argument('--times', help='Calculated times are saving into this file.')
     parser.add_argument('--out', default='-', help='File for saving the program to. "-" for standard output.')
     parser.add_argument('--replacements', help='replacement file')
+    parser.add_argument('--work-dir', default=None, help='Base working directory for media file resolution')
     parser.add_argument('--debug-time-diff', type=int, default=0, help='This will be added to the actual time (minutes)')
     args = parser.parse_args(args=argv)
 
@@ -639,14 +644,14 @@ def main(argv):
 
         # print(get_owghat(datetime.datetime.strptime(args.date, '%Y-%m-%d').date()), file=sys.stderr)
         owghat = get_owghat(date, timezone_name=tz, location_latlonelev=(location.latitude, location.longitude, location.altitude/1000))
-        azan_prayertimes = {o:t*3600 for o,t in owghat.items()}
+        azan_prayertimes = {o:int(t*3600) for o,t in owghat.items()}
         print('PrayerTimes', azan_prayertimes, {o:f_to_hms(t*3600) for o, t in owghat.items()}, file=sys.stderr)
 
         # fetch Qamari (Hijri) date: from praytimes.org or najaf.org when not using aviny API, else from aviny API
             
         url = f'https://prayer.aviny.com/api/prayertimes/{args.city_aviny}'
         try:
-            r = requests.get(url, timeout=15)
+            r = requests.get(url, timeout=2)
             r.raise_for_status()
             r = r.json()
             todayQamari = r['TodayQamari']
@@ -657,7 +662,8 @@ def main(argv):
             print('Aviny', azan_aviny, azan_r, file=sys.stderr)
         except (requests.exceptions.Timeout, requests.RequestException, KeyError, ValueError) as e:
             azan_aviny = {o:0 for o in ['imsak', 'fajr', 'sunrise', 'dhuhr', 'asr', 'sunset', 'maghrib', 'isha', 'midnight']}
-            print(f'Failed to fetch aviny API: {e}', file=sys.stderr)
+            # todayQamari = '1444/10/11'
+            print(f'Failed to fetch aviny API: ', file=sys.stderr)
             try:
                 url = f'https://www.najaf.org/persian/prayer.php?city=united-kingdom_london'
                 r = requests.get(url, timeout=10).text
@@ -665,7 +671,7 @@ def main(argv):
                 todayQamari = parsed['qamari']
                 print('Qamari from Najaf.org', todayQamari, parsed, file=sys.stderr)
             except (ValueError, KeyError, requests.RequestException) as e:
-                print(f'Failed to parse najaf date HTML: {e}', file=sys.stderr)
+                print(f'Failed to parse najaf date HTML: ', file=sys.stderr)
                 try:
                     r = requests.get('https://praytimes.org/', timeout=10)
                     r.raise_for_status()

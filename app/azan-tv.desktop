@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AZAN TV
+Comment=Pre- and post-prayer streaming control panel
+Exec=azan-tv
+Icon=azan-tv
+Terminal=false
+Categories=AudioVideo;Video;
+StartupNotify=true
