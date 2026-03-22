@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QFormLayout,
     QProgressBar,
+    QGridLayout,
     QScrollArea,
     QGroupBox,
     QCheckBox,
@@ -145,6 +146,21 @@ def _make_text_edit(placeholder="", rtl=False):
         opt.setTextDirection(Qt.LayoutDirection.RightToLeft)
         te.document().setDefaultTextOption(opt)
     return te
+
+
+def _show_scrollable_text_dialog(parent, title, text):
+    dlg = QDialog(parent)
+    dlg.setWindowTitle(title)
+    dlg.resize(820, 420)
+    lo = QVBoxLayout(dlg)
+    view = QTextEdit()
+    view.setReadOnly(True)
+    view.setPlainText(text or "")
+    lo.addWidget(view)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+    buttons.accepted.connect(dlg.accept)
+    lo.addWidget(buttons)
+    dlg.exec()
 
 
 class YouTubeSetupWizard(QDialog):
@@ -356,6 +372,15 @@ class App(QWidget):
         lo.addWidget(QLabel(f"App files: {paths['app_dir']}"))
         lo.addWidget(QLabel(f"Working folder: {paths['work_dir']}"))
         lo.addWidget(QLabel(f"Cache/logs folder: {paths['cache_dir']}"))
+        build_info = backend.get_build_info() or {}
+        build_summary = "Build: unknown"
+        if build_info:
+            build_summary = (
+                f"Build: {build_info.get('build_timestamp_utc', 'unknown')} UTC"
+                f" | version {build_info.get('release_version', '?')}"
+                f" | arch {build_info.get('target_arch', '?')}"
+            )
+        lo.addWidget(QLabel(build_summary))
         lo.addWidget(QLabel("Status"))
         self.today_info_label = QLabel("Today: -")
         lo.addWidget(self.today_info_label)
@@ -475,7 +500,7 @@ class App(QWidget):
     def _do_install_ffplayout(self):
         err = backend.install_ffplayout()
         if err:
-            QMessageBox.critical(self, "Install ffplayout", err)
+            _show_scrollable_text_dialog(self, "Install ffplayout", err)
         else:
             QMessageBox.information(self, "Install ffplayout", "Installed successfully. You can run desktop/TV/stream now.")
 
@@ -899,9 +924,21 @@ class App(QWidget):
         lo.addWidget(work_dir_label)
         _cfg_w = 480  # minimum width for config fields (~2x default)
         form = QFormLayout()
+        form.setHorizontalSpacing(8)
+        form.setVerticalSpacing(4)
         self.cfg_city = QLineEdit()
         self.cfg_city.setMinimumWidth(_cfg_w)
-        form.addRow("City:", self.cfg_city)
+        city_row_widget = QWidget()
+        city_row = QHBoxLayout(city_row_widget)
+        city_row.setContentsMargins(0, 0, 0, 0)
+        city_row.addWidget(self.cfg_city, 1)
+        self.btn_check_city = QPushButton("Check city", clicked=self._check_city_name)
+        city_row.addWidget(self.btn_check_city)
+        form.addRow("City:", city_row_widget)
+        self.cfg_city_status = QLabel("City not checked")
+        self.cfg_city_status.setWordWrap(False)
+        self.cfg_city_status.setMinimumWidth(400)
+        form.addRow("Resolved city:", self.cfg_city_status)
         self.cfg_city_aviny = QLineEdit()
         self.cfg_city_aviny.setMinimumWidth(_cfg_w)
         form.addRow("City Aviny ID:", self.cfg_city_aviny)
@@ -914,7 +951,7 @@ class App(QWidget):
         form.addRow("Title:", self.cfg_title)
         self.cfg_description = QTextEdit()
         self.cfg_description.setMinimumWidth(_cfg_w)
-        self.cfg_description.setMaximumHeight(80)
+        self.cfg_description.setMaximumHeight(20)
         form.addRow("Description:", self.cfg_description)
         self.cfg_thumbnails = QLineEdit()
         self.cfg_thumbnails.setMinimumWidth(_cfg_w)
@@ -939,11 +976,21 @@ class App(QWidget):
         form.addRow("YouTube oauth token file:", self.cfg_oauth2)
 
         self.cfg_tr = {}
-        for key in ("imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight"):
+        translation_grid = QGridLayout()
+        translation_grid.setHorizontalSpacing(10)
+        translation_grid.setVerticalSpacing(4)
+        translation_keys = ("imsak", "fajr", "sunrise", "dhuhr", "asr", "sunset", "maghrib", "isha", "midnight")
+        for idx, key in enumerate(translation_keys):
             e = QLineEdit()
-            e.setMinimumWidth(_cfg_w)
+            e.setMinimumWidth(100)
             self.cfg_tr[key] = e
-            form.addRow(f"Translation {key}:", e)
+            row = idx // 3
+            col = (idx % 3) * 2
+            translation_grid.addWidget(QLabel(f"{key}:"), row, col)
+            translation_grid.addWidget(e, row, col + 1)
+        translation_widget = QWidget()
+        translation_widget.setLayout(translation_grid)
+        form.addRow("Translations:", translation_widget)
         lo.addLayout(form)
         lo.addWidget(QPushButton("Save config", clicked=self._save_config))
         self.config_status = QLabel("Idle")
@@ -997,6 +1044,14 @@ class App(QWidget):
         }
         backend.config_save(data)
         self.config_status.setText("Saved.")
+
+    def _check_city_name(self):
+        city = self.cfg_city.text().strip()
+        info = backend.validate_city_name(city)
+        if info.get("ok"):
+            self.cfg_city_status.setText(info.get("message", "City resolved"))
+        else:
+            self.cfg_city_status.setText(f"City check failed: {info.get('message', 'Unknown error')}")
 
     def _tab_run(self):
         w = QWidget()
@@ -1291,11 +1346,19 @@ class App(QWidget):
         req = backend.required_files_for_today()
         if req.get("missing_count", 0) > 0:
             missing = [f["path"] for f in req.get("files", []) if not f.get("exists")]
-            QMessageBox.critical(
-                self,
-                "Run",
-                "Some media files for today's program are missing.\n\nMissing:\n" + "\n".join(missing[:20]) + ("\n..." if len(missing) > 20 else ""),
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Critical)
+            box.setWindowTitle("Run")
+            box.setText(
+                "Some media files for today's program are missing.\n\nMissing:\n"
+                + "\n".join(missing[:20])
+                + ("\n..." if len(missing) > 20 else "")
             )
+            download_btn = box.addButton("Download required files", QMessageBox.ButtonRole.AcceptRole)
+            box.addButton(QMessageBox.StandardButton.Ok)
+            box.exec()
+            if box.clickedButton() == download_btn:
+                self._download_required_for_today()
             return
         if req.get("error") and not req.get("files"):
             QMessageBox.critical(self, "Start", req.get("error", "Could not load program."))

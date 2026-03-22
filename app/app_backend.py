@@ -203,6 +203,45 @@ def _fetch_text(url, timeout):
         return resp.read().decode(charset, errors="replace")
 
 
+def validate_city_name(city_name):
+    """
+    Validate/resolve a city using the same Nominatim data source as gen_playlist.
+    Returns resolved display name, country, lat/lon on success.
+    """
+    query = (city_name or "").strip()
+    if not query:
+        return {"ok": False, "message": "City name is required"}
+    try:
+        url = (
+            "https://nominatim.openstreetmap.org/search?"
+            + urllib.parse.urlencode(
+                {
+                    "q": query,
+                    "format": "jsonv2",
+                    "limit": 1,
+                    "addressdetails": 1,
+                }
+            )
+        )
+        rows = json.loads(_fetch_text(url, timeout=8))
+        if not rows:
+            return {"ok": False, "message": f'City "{query}" was not found'}
+        item = rows[0]
+        address = item.get("address") or {}
+        country = address.get("country") or (item.get("display_name", "").split(",")[-1].strip() if item.get("display_name") else "")
+        return {
+            "ok": True,
+            "query": query,
+            "display_name": item.get("display_name", query),
+            "country": country,
+            "lat": item.get("lat"),
+            "lon": item.get("lon"),
+            "message": f'{item.get("display_name", query)} | Country: {country}',
+        }
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
 def _resolve_hijri_day_for_date(g_date):
     cfg, _ = config_get()
     city_aviny = (cfg or {}).get("city_aviny", 2130)
@@ -339,6 +378,17 @@ def get_paths():
         "logs_dir": str(LOGS_DIR),
         "run_log_file": str(LOGS_DIR / RUN_LOG_FILE),
     }
+
+
+def get_build_info():
+    build_info_path = APP_DIR / "build-info.json"
+    if not build_info_path.exists():
+        return None
+    try:
+        with open(build_info_path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def uninstall_info():
@@ -1511,6 +1561,15 @@ def _bundled_python_site_packages():
     return site_packages if site_packages.exists() else None
 
 
+def _bundled_ca_bundle():
+    bundled_site = _bundled_python_site_packages()
+    if bundled_site:
+        certifi_bundle = bundled_site / "certifi" / "cacert.pem"
+        if certifi_bundle.exists():
+            return certifi_bundle
+    return None
+
+
 def _bundled_python_is_usable():
     lib_dir = _bundled_python_lib_dir()
     if not lib_dir:
@@ -1538,6 +1597,11 @@ def _python_runtime_env():
     bundled_root = _bundled_python_root()
     if bundled_root and _python_exe() == str(bundled_root / "bin" / "python3") and _bundled_python_is_usable():
         extra["PYTHONHOME"] = str(bundled_root)
+    ca_bundle = _bundled_ca_bundle()
+    if ca_bundle:
+        extra["SSL_CERT_FILE"] = str(ca_bundle)
+        extra["REQUESTS_CA_BUNDLE"] = str(ca_bundle)
+        extra["CURL_CA_BUNDLE"] = str(ca_bundle)
     return extra
 
 

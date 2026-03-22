@@ -534,6 +534,7 @@ def main(argv):
             raise FileNotFoundError(f"ffplayout template not found: tried work_dir and {script_dir} for {template_name!r}")
         with open(template_path, "r", encoding="utf-8") as f:
             ffplayout_template = f.read()
+        ffplayout_template = ffplayout_template.replace("rpc_server:\n  help_text: Run a JSON RPC server, for getting infos about current playing and for some control functions.\n  enable: true", "rpc_server:\n  help_text: Run a JSON RPC server, for getting infos about current playing and for some control functions.\n  enable: false")
         # Use only paths inside our work dir (no /var, /usr etc.) so we don't need write access to system dirs
         ffplayout_template = ffplayout_template.replace("/var/lib/ffplayout/playlists", work_dir)
         ffplayout_template = ffplayout_template.replace("/var/log/ffplayout/", work_dir + os.sep)

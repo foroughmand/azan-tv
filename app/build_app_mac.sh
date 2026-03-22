@@ -26,6 +26,7 @@ RELEASE_FILE_BASENAME="${RELEASE_FILE_BASENAME:-${APP_NAME}-macos-${TARGET_ARCH}
 ICON_PNG="${ICON_PNG:-$REPO_ROOT/app/bundles/azan-tv-icon.png}"
 ICON_ICNS="${ICON_ICNS:-$REPO_ROOT/app/bundles/${APP_NAME}.icns}"
 REQUIRE_FFPLAY="${REQUIRE_FFPLAY:-1}"
+BUILD_TIMESTAMP_UTC="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 if [[ "$(uname)" != "Darwin" ]]; then
   echo "This script is for macOS only. Use build_app.sh for Linux."
@@ -550,6 +551,14 @@ fi
 
 # Copy stream/, data/; create empty keys/ (secrets are not bundled)
 mkdir -p "$RESOURCES/stream" "$RESOURCES/data" "$RESOURCES/keys"
+cat > "$RESOURCES/build-info.json" <<EOF
+{
+  "app_name": "$APP_NAME",
+  "release_version": "$RELEASE_VERSION",
+  "target_arch": "$TARGET_ARCH",
+  "build_timestamp_utc": "$BUILD_TIMESTAMP_UTC"
+}
+EOF
 if [[ -d "$REPO_ROOT/stream" ]]; then
   for f in live-stream.py gen_playlist.py config.json network-program-hard.json ffplayout-template.yml ffplayout-template.toml; do
     if [[ -f "$REPO_ROOT/stream/$f" ]]; then cp -f "$REPO_ROOT/stream/$f" "$RESOURCES/stream/$f"; fi
